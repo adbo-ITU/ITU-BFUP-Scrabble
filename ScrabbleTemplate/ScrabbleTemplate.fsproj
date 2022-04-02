@@ -13,7 +13,7 @@
 
   <ItemGroup>
     <PackageReference Include="Oxyphenbutazone" Version="1.0.11" />
-    <PackageReference Include="ScrabbleServer" Version="1.0.19" />
+    <PackageReference Include="ScrabbleServer" Version="1.0.20" />
     <PackageReference Update="FSharp.Core" Version="6.0.3" />
   </ItemGroup>
 
