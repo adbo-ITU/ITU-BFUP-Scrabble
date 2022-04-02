@@ -48,15 +48,14 @@ let main argv =
     let port = 13001
 
     let dictAPI =
-        // Uncomment if you have implemented a dictionary. last element None if you have not implemented a GADDAG
-        // Some (Dictionary.empty, Dictionary.insert, Dictionary.step, Some Dictionary.reverse)
-        None
+        Some(Dictionary.empty, Dictionary.insert, Dictionary.step, Some Dictionary.reverse)
 
     let (dictionary, time) =
         time (fun () -> ScrabbleUtil.Dictionary.mkDict words dictAPI)
 
     let players =
-        [ ("The Grafted", dictionary, TheGrafted.Scrabble.startGame) ]
+        [ ("OxyphenButazone", dictionary, Oxyphenbutazone.Scrabble.startGame)
+          ("Ah, the Grafted", dictionary, TheGrafted.Scrabble.startGame) ]
 
     // let players =
     //     spawnMultiples "OxyphenButazone" dictionary Oxyphenbutazone.Scrabble.startGame 4
