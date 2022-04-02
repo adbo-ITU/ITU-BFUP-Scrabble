@@ -5,15 +5,15 @@
     <TargetFramework>net6.0</TargetFramework>
     <GeneratePackageOnBuild>true</GeneratePackageOnBuild>
     <Company>IT University of Copenhagen</Company>
-    
+
     <Version>1.0.0</Version>
-    <PackageId>YourIdGoesHere</PackageId>
-    <AssemblyName>YourIdGoesHere</AssemblyName>
-    <Authors>Your names go here (optional since this is hosted in a public Github repository)</Authors>
-    <Product>The bot name goes here</Product>
+    <PackageId>TheGrafted</PackageId>
+    <AssemblyName>TheGrafted</AssemblyName>
+    <Authors>Joachim Alexander Borup, Adrian Valdemar Borup</Authors>
+    <Product>The Grafted</Product>
     <Description>Scrabble Bot for Functional Programming 2022
 
-Group name: &lt;Your group name goes here&gt; (optional since this is hosted in a public Github repository)</Description>
+Group name: The Grafted</Description>
   </PropertyGroup>
 
   <ItemGroup>
