@@ -47,19 +47,27 @@ module State =
     type state =
         { board: Parser.board
           dict: ScrabbleUtil.Dictionary.Dict
-          playerNumber: uint32
+          ourPlayerNumber: uint32
+          players: uint32 list
           hand: MultiSet.MultiSet<uint32> }
 
-    let mkState b d pn h =
+    let mkState b d pn h currentPlayer numPlayers =
+        let players =
+            Utils.rotate (currentPlayer - 1) [ 1u .. numPlayers ]
+
         { board = b
           dict = d
-          playerNumber = pn
+          players = players
+          ourPlayerNumber = pn
           hand = h }
 
     let board st = st.board
     let dict st = st.dict
-    let playerNumber st = st.playerNumber
+    let ourPlayerNumber st = st.ourPlayerNumber
     let hand st = st.hand
+    let numberOfPlayers st = List.length st.players
+    let currentPlayer st = List.head st.players
+    let nextPlayersList st = Utils.rotate 1u st.players
 
 module Scrabble =
     open System.Threading
@@ -76,16 +84,34 @@ module Scrabble =
             let input = System.Console.ReadLine()
             let move = RegEx.parseMove input
 
-            debugPrint (sprintf "Player %d -> Server:\n%A\n" (State.playerNumber st) move) // keep the debug lines. They are useful.
+            debugPrint (sprintf "Player %d -> Server:\n%A\n" (State.ourPlayerNumber st) move) // keep the debug lines. They are useful.
             send cstream (SMPlay move)
 
             let msg = recv cstream
-            debugPrint (sprintf "Player %d <- Server:\n%A\n" (State.playerNumber st) move) // keep the debug lines. They are useful.
+            debugPrint (sprintf "Player %d <- Server:\n%A\n" (State.ourPlayerNumber st) move) // keep the debug lines. They are useful.
 
             match msg with
-            | RCM (CMPlaySuccess (ms, points, newPieces)) ->
-                (* Successful play by you. Update your state (remove old tiles, add the new ones, change turn, etc) *)
-                let st' = st // This state needs to be updated
+            // A successful play was made by us
+            | RCM (CMPlaySuccess (moves, points, newTiles)) ->
+                // Remove old tiles
+                let handWithRemoved =
+                    List.fold (fun hand' (_, (tileId, _)) -> MultiSet.removeSingle tileId hand') st.hand moves
+
+                // Add new tiles
+                let newHand =
+                    List.fold
+                        (fun hand' (tileId, numTiles) -> MultiSet.add tileId numTiles hand')
+                        handWithRemoved
+                        newTiles
+
+                // Update turn
+                let nextPlayers = State.nextPlayersList st
+
+                let st' =
+                    { st with
+                        hand = newHand
+                        players = nextPlayers }
+
                 aux st'
             | RCM (CMPlayed (pid, ms, points)) ->
                 (* Successful play by other player. Update your state *)
@@ -100,7 +126,6 @@ module Scrabble =
             | RGPE err ->
                 printfn "Gameplay Error:\n%A" err
                 aux st
-
 
         aux st
 
@@ -136,4 +161,4 @@ module Scrabble =
         let handSet =
             List.fold (fun acc (x, k) -> MultiSet.add x k acc) MultiSet.empty hand
 
-        fun () -> playGame cstream tiles (State.mkState board dict playerNumber handSet)
+        fun () -> playGame cstream tiles (State.mkState board dict playerNumber handSet playerTurn numPlayers)
