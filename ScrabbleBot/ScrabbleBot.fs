@@ -10,32 +10,40 @@ type gameState =
       pieces: Map<uint32, tile>
       placedTiles: Map<coord, uint32 * (char * int)> }
 
+let rec foo (state: gameState) wordAcc =
+    ScrabbleUtil.DebugPrint.debugPrint (sprintf "current word acc: %A\n" wordAcc)
 
+    let aux tileId =
+        let lulw (ch, _) =
+            ScrabbleUtil.DebugPrint.debugPrint (sprintf "dict step: %A\n" (ScrabbleUtil.Dictionary.step ch state.dict))
 
-let rec searchDict (state : gameState) (currentLetter : char) =
-    let rec bar state acc (ch, pv) =
-        match ScrabbleUtil.Dictionary.step ch state.dict with
-        | Some (isWord, _) when isWord -> ch :: acc
-        | Some (_, dict) -> searchDict { state with dict = dict} ch
-        | None -> acc 
+            match ScrabbleUtil.Dictionary.step ch state.dict with
+            | Some (isWord, _) when isWord -> Some(ch :: wordAcc)
+            | Some (_, subDict) ->
+                foo
+                    { state with
+                        dict = subDict
+                        hand = MultiSet.removeSingle tileId state.hand }
+                    (ch :: wordAcc)
+            | None -> None
 
-    let rec foo state acc tileID amount =
-        let acc' = Set.fold (bar state) List.empty (Map.find tileID state.pieces)
-        //if List.isEmpty acc then acc' :: acc else acc
-    
-    let hand' = MultiSet.toList state.hand
-    List.find (foo state) hand'
+        let folder acc piece =
+            match acc with
+            | Some (_) -> acc
+            | None -> lulw piece
 
-    //MultiSet.fold (foo state) List.empty state.hand
+        let tile = Map.find tileId state.pieces
+        Set.fold folder None tile
 
-let computeMove (state : gameState) =
-    // Iterate through each tile
-    // For each tile, find all valid words starting with this tile
-    
-    let firstTile = Map.toList state.placedTiles |> List.head
-    let firstLetter = firstTile |> snd |> snd |> fst
-    let move = searchDict state firstLetter
+    let folder acc tileId _ =
+        match acc with
+        | Some (_) -> acc
+        | None -> aux tileId
 
-    List.empty // (coord, tile) list
+    MultiSet.fold folder None state.hand
 
-
+let findWord (state: gameState) firstLetter =
+    match ScrabbleUtil.Dictionary.step firstLetter state.dict with
+    | Some (_, subDict) -> foo { state with dict = subDict } [ firstLetter ]
+    | None -> None
+    |> Option.map List.rev

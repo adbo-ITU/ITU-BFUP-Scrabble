@@ -71,7 +71,15 @@ module State =
     let currentPlayer st = List.head st.players
     let nextPlayersList st = Utils.rotate 1u st.players
     // forefeitPlayer also advances the turn to the next player
-    let forfeitPlayer st pid = List.filter (fun player -> player <> pid) (nextPlayersList st)
+    let forfeitPlayer st pid =
+        List.filter (fun player -> player <> pid) (nextPlayersList st)
+
+    let toBotGameState st pieces : ScrabbleBot.gameState =
+        { board = st.board
+          dict = st.dict
+          hand = st.hand
+          pieces = pieces
+          placedTiles = st.placedTiles }
 
 module Scrabble =
     open System.Threading
@@ -79,6 +87,13 @@ module Scrabble =
     let playGame cstream pieces (st: State.state) =
 
         let rec aux (st: State.state) =
+            let testHand = MultiSet.ofList [ 1u; 10u; 11u; 12u ]
+
+            let botGameState =
+                { State.toBotGameState st pieces with hand = testHand }
+
+            debugPrint (sprintf "STATE: %A\nRESULT: %A\n" botGameState (ScrabbleBot.findWord botGameState 'A'))
+
             Print.printHand pieces (State.hand st)
 
             // remove the force print when you move on from manual input (or when you have learnt the format)
@@ -125,7 +140,7 @@ module Scrabble =
                 // Add tiles placed
                 let newTiles =
                     List.fold (fun tiles' (coord, tile) -> Map.add coord tile tiles') st.placedTiles moves
-                
+
                 let st' =
                     { st with
                         players = State.nextPlayersList st
@@ -138,26 +153,28 @@ module Scrabble =
             | RCM (CMChangeSuccess changedTiles) ->
                 // Remove old tiles, and add new tiles
                 let newHand =
-                    List.fold (fun hand' (removed, received) -> MultiSet.removeSingle removed hand' |> MultiSet.addSingle received) st.hand changedTiles
+                    List.fold
+                        (fun hand' (removed, received) ->
+                            MultiSet.removeSingle removed hand'
+                            |> MultiSet.addSingle received)
+                        st.hand
+                        changedTiles
 
                 let st' =
                     { st with
                         players = State.nextPlayersList st
                         hand = newHand }
-                        
+
                 aux st'
 
             // RCM (CMTimeOut _) is not defined
             | RCM (CMPlayFailed _)
             | RCM (CMPassed _)
-            | RCM (CMChange _) ->
-                aux { st with players = State.nextPlayersList st }
+            | RCM (CMChange _) -> aux { st with players = State.nextPlayersList st }
 
-            | RCM (CMForfeit pid) -> 
-                aux { st with players = State.forfeitPlayer st pid }
+            | RCM (CMForfeit pid) -> aux { st with players = State.forfeitPlayer st pid }
 
-            | RCM (CMGameOver _) -> 
-                debugPrint "Game over"
+            | RCM (CMGameOver _) -> debugPrint "Game over"
 
             | RCM a -> failwith (sprintf "not implmented: %A" a)
             | RGPE err ->
