@@ -23,7 +23,7 @@ let addSingle a = add a 1u
 
 let remove a n s =
     match s with
-    | MS (m) when n > numItems a s -> MS(Map.remove a m)
+    | MS (m) when n >= numItems a s -> MS(Map.remove a m)
     | MS (m) -> MS(Map.add a (numItems a s - n) m)
 
 let removeSingle a = remove a 1u
