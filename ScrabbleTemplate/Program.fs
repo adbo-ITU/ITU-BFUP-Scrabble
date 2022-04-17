@@ -49,7 +49,8 @@ let main argv =
     let port = 13001
 
     let dictAPI =
-        Some(Dictionary.empty, Dictionary.insert, Dictionary.step, Some Dictionary.reverse)
+        // Some(Dictionary.empty, Dictionary.insert, Dictionary.step, Some Dictionary.reverse)
+        Some(Dictionary.empty, Dictionary.insert, Dictionary.step, None)
 
     let (dictionary, time) =
         time (fun () -> ScrabbleUtil.Dictionary.mkDict words dictAPI)
