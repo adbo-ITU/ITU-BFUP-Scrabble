@@ -53,7 +53,7 @@ module State =
 
     let mkState b d pn h currentPlayer numPlayers =
         let players =
-            Utils.rotate (currentPlayer - 1) [ 1u .. numPlayers ]
+            Utils.rotate (uint32 currentPlayer - 1u) [ 1u .. numPlayers ]
 
         { board = b
           dict = d
