@@ -43,7 +43,23 @@ let rec foo (state: gameState) wordAcc =
     MultiSet.fold folder None state.hand
 
 let findWord (state: gameState) firstLetter =
+    let convertResultToWord result =
+        let sentinelIndex =
+            List.findIndex (fun ch -> ch = '#') result
+
+        let seq = Seq.ofList result
+
+        let first =
+            Seq.take sentinelIndex seq
+            |> Seq.rev
+            |> Seq.toList
+
+        let second =
+            Seq.skip (sentinelIndex + 1) seq |> Seq.toList
+
+        first @ second
+
     match ScrabbleUtil.Dictionary.step firstLetter state.dict with
     | Some (_, subDict) -> foo { state with dict = subDict } [ firstLetter ]
     | None -> None
-    |> Option.map List.rev
+    |> Option.map convertResultToWord
