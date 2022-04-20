@@ -49,7 +49,8 @@ module State =
           dict: ScrabbleUtil.Dictionary.Dict
           ourPlayerNumber: uint32
           players: uint32 list
-          hand: MultiSet.MultiSet<uint32> }
+          hand: MultiSet.MultiSet<uint32>
+          placedTiles: Map<coord, uint32 * (char * int)> }
 
     let mkState b d pn h currentPlayer numPlayers =
         let players =
@@ -59,7 +60,8 @@ module State =
           dict = d
           players = players
           ourPlayerNumber = pn
-          hand = h }
+          hand = h
+          placedTiles = Map.empty }
 
     let board st = st.board
     let dict st = st.dict
@@ -68,6 +70,16 @@ module State =
     let numberOfPlayers st = List.length st.players
     let currentPlayer st = List.head st.players
     let nextPlayersList st = Utils.rotate 1u st.players
+    // forefeitPlayer also advances the turn to the next player
+    let forfeitPlayer st pid =
+        List.filter (fun player -> player <> pid) (nextPlayersList st)
+
+    let toBotGameState st pieces : ScrabbleBot.gameState =
+        { board = st.board
+          dict = st.dict
+          hand = st.hand
+          pieces = pieces
+          placedTiles = st.placedTiles }
 
 module Scrabble =
     open System.Threading
@@ -75,6 +87,13 @@ module Scrabble =
     let playGame cstream pieces (st: State.state) =
 
         let rec aux (st: State.state) =
+            let testHand = MultiSet.ofList [ 1u; 10u; 11u; 12u ]
+
+            let botGameState =
+                { State.toBotGameState st pieces with hand = testHand }
+
+            debugPrint (sprintf "STATE: %A\nRESULT: %A\n" botGameState (ScrabbleBot.findWord botGameState 'A'))
+
             Print.printHand pieces (State.hand st)
 
             // remove the force print when you move on from manual input (or when you have learnt the format)
@@ -97,31 +116,66 @@ module Scrabble =
                 let handWithRemoved =
                     List.fold (fun hand' (_, (tileId, _)) -> MultiSet.removeSingle tileId hand') st.hand moves
 
-                // Add new tiles
+                // Add tiles placed
                 let newHand =
                     List.fold
                         (fun hand' (tileId, numTiles) -> MultiSet.add tileId numTiles hand')
                         handWithRemoved
                         newTiles
 
-                // Update turn
-                let nextPlayers = State.nextPlayersList st
+                // Add squares placed
+                let newTiles =
+                    List.fold (fun tiles' (coord, tile) -> Map.add coord tile tiles') st.placedTiles moves
 
                 let st' =
                     { st with
                         hand = newHand
-                        players = nextPlayers }
+                        players = State.nextPlayersList st
+                        placedTiles = newTiles }
 
                 aux st'
-            | RCM (CMPlayed (pid, ms, points)) ->
-                (* Successful play by other player. Update your state *)
-                let st' = st // This state needs to be updated
+
+            // Successful play by other player.
+            | RCM (CMPlayed (pid, moves, points)) ->
+                // Add tiles placed
+                let newTiles =
+                    List.fold (fun tiles' (coord, tile) -> Map.add coord tile tiles') st.placedTiles moves
+
+                let st' =
+                    { st with
+                        players = State.nextPlayersList st
+                        placedTiles = newTiles }
+
                 aux st'
-            | RCM (CMPlayFailed (pid, ms)) ->
-                (* Failed play. Update your state *)
-                let st' = st // This state needs to be updated
+
+            // Assuming that (uint32 * uint32) list, is a list of (removed, received) tiles.
+            // Succesful change of tiles by us
+            | RCM (CMChangeSuccess changedTiles) ->
+                // Remove old tiles, and add new tiles
+                let newHand =
+                    List.fold
+                        (fun hand' (removed, received) ->
+                            MultiSet.removeSingle removed hand'
+                            |> MultiSet.addSingle received)
+                        st.hand
+                        changedTiles
+
+                let st' =
+                    { st with
+                        players = State.nextPlayersList st
+                        hand = newHand }
+
                 aux st'
-            | RCM (CMGameOver _) -> ()
+
+            // RCM (CMTimeOut _) is not defined
+            | RCM (CMPlayFailed _)
+            | RCM (CMPassed _)
+            | RCM (CMChange _) -> aux { st with players = State.nextPlayersList st }
+
+            | RCM (CMForfeit pid) -> aux { st with players = State.forfeitPlayer st pid }
+
+            | RCM (CMGameOver _) -> debugPrint "Game over"
+
             | RCM a -> failwith (sprintf "not implmented: %A" a)
             | RGPE err ->
                 printfn "Gameplay Error:\n%A" err
