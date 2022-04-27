@@ -87,12 +87,32 @@ module Scrabble =
     let playGame cstream pieces (st: State.state) =
 
         let rec aux (st: State.state) =
-            let testHand = MultiSet.ofList [ 1u; 10u; 11u; 12u ]
+            let testHand =
+                MultiSet.ofList [ 14u
+                                  5u
+                                  19u
+                                  19u
+                                  9u
+                                  14u
+                                  7u ]
+
+            let testPlacedTiles =
+                Map.ofList [ ((0, 0), (6u, ('F', 4)))
+                             ((1, 0), (9u, ('I', 1)))
+                             ((2, 0), (20u, ('T', 1)))
+                             ((1, -1), (20u, ('T', 1)))
+                             ((1, 1), (11u, ('K', 1)))
+                             ((1, 2), (9u, ('I', 1))) ]
 
             let botGameState =
-                { State.toBotGameState st pieces with hand = testHand }
+                { State.toBotGameState st pieces with
+                    hand = testHand
+                    placedTiles = testPlacedTiles }
 
-            debugPrint (sprintf "STATE: %A\nRESULT: %A\n" botGameState (ScrabbleBot.findWord botGameState 'A'))
+            // debugPrint (sprintf "STATE: %A\nRESULT: %A\n" botGameState (ScrabbleBot.findWord botGameState 'A'))
+            debugPrint "\n"
+            ScrabbleBot.findPlay botGameState
+            debugPrint "\n"
 
             Print.printHand pieces (State.hand st)
 
@@ -181,7 +201,12 @@ module Scrabble =
                 printfn "Gameplay Error:\n%A" err
                 aux st
 
-        aux st
+        try
+            aux st
+        with
+        | ex ->
+            debugPrint (sprintf "Error: %A" ex)
+            raise ex
 
     let startGame
         (boardP: boardProg)

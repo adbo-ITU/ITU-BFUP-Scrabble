@@ -13,3 +13,10 @@ let rotate (step: uint32) input =
         (step, ls)
         ls
     |> fun (x, y) -> y |> List.ofSeq
+
+let addCoords (a: int * int) (b: int * int) = (fst a + fst b, snd a + snd b)
+
+let flatMap f opt =
+    match opt with
+    | Some x -> f x
+    | _ -> None

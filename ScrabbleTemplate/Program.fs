@@ -29,18 +29,17 @@ let main argv =
 
     let board =
         ScrabbleUtil.StandardBoard.standardBoard ()
-        //let board      = ScrabbleUtil.InfiniteBoard.infiniteBoard ()
+    //let board      = ScrabbleUtil.InfiniteBoard.infiniteBoard ()
 
-        //let board      = ScrabbleUtil.RandomBoard.randomBoard ()
-        //let board      = ScrabbleUtil.RandomBoard.randomBoardSeed (Some 42)
-        //let board      = ScrabbleUtil.InfiniteRandomBoard.infiniteRandomBoard ()
-        //let board      = ScrabbleUtil.InfiniteRandomBoard.infiniteRandomBoardSeed (Some 42)
+    //let board      = ScrabbleUtil.RandomBoard.randomBoard ()
+    //let board      = ScrabbleUtil.RandomBoard.randomBoardSeed (Some 42)
+    //let board      = ScrabbleUtil.InfiniteRandomBoard.infiniteRandomBoard ()
+    //let board      = ScrabbleUtil.InfiniteRandomBoard.infiniteRandomBoardSeed (Some 42)
 
-        //let board      = ScrabbleUtil.HoleBoard.holeBoard ()
-        //let board      = ScrabbleUtil.InfiniteHoleBoard.infiniteHoleBoard ()
+    //let board      = ScrabbleUtil.HoleBoard.holeBoard ()
+    //let board      = ScrabbleUtil.InfiniteHoleBoard.infiniteHoleBoard ()
 
-    let words =
-        readLines "./Dictionaries/CommonEnglishWords10000.txt"
+    let words = readLines "./Dictionaries/IDK.txt"
 
     let handSize = 7u
     let timeout = None
