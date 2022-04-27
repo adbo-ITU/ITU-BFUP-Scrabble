@@ -1,5 +1,7 @@
 ﻿module internal ScrabbleBot
 
+open ScrabbleUtil.DebugPrint
+
 type coord = int * int
 type tile = Set<char * int>
 type placedTilesMap = Map<coord, uint32 * (char * int)>
@@ -177,10 +179,65 @@ let initMoveWithExistingWord (pos: coord) (state: gameState) (directionVector: i
 
     initialMoveState
 
+let validateTilePlacement (pos: coord) (letter: char) (state: gameState) (direction: coord) =
+    // TODO: After each attempt to place a tile, use this function to check if
+    //       it is legal to place the tile at the given position. That is,
+    //          1. The tile is unoccupied
+    //          2. The tile placement does not form an illegal word
+    failwith "not implemented"
+
+let rec tryFindValidMove (state: gameState) (moveState: MoveState) (direction: coord) =
+    let handleTileId tileId =
+        let handleLetter (ch, _) =
+            debugPrint (sprintf "MOVE STATE Letter: %A. State: %A\n" ch moveState)
+
+            match ScrabbleUtil.Dictionary.step ch moveState.dict with
+            | Some (isWord, _) when isWord -> Some(ch :: moveState.wordAcc)
+            | Some (_, subDict) ->
+                tryFindValidMove
+                    { state with
+                        dict = subDict
+                        hand = MultiSet.removeSingle tileId state.hand }
+                    { moveState with
+                        dict = subDict
+                        cursor = Utils.addCoords moveState.cursor direction
+                        wordAcc = ch :: moveState.wordAcc }
+                    direction
+            | None -> None
+
+        let folder acc piece =
+            match acc with
+            | Some (_) -> acc
+            | None -> handleLetter piece
+
+        let tile = Map.find tileId state.pieces
+        Set.fold folder None tile
+
+    let folder acc tileId _ =
+        match acc with
+        | Some (_) -> acc
+        | None -> handleTileId tileId
+
+    MultiSet.fold folder None state.hand
+
+let findMoveOnSquare (pos: coord) (state: gameState) =
+    // Explore right
+    let rightResult =
+        tryFindValidMove state (initMoveWithExistingWord pos state (1, 0)) (1, 0)
+
+    // Explore down
+    // let moveState = initMoveWithExistingWord pos state (0, 1)
+
+    // TODO: Some opposite direction logic in gaddag
+    // Explore up
+    // Explore left
+
+    debugPrint (sprintf "Result right: %A" rightResult)
+
 // TODO: Handle outside of board, handle holes in board etc.
 // TODO: use useAllPossibleSpawnPositions to find all possible start locations,
 //       then try to find move on each spawn location.
 // TODO: Implement a function to find a move on a given square - will explore
 //       up, down, left, right
-let findPlay (state: gameState) =
-    initMoveWithExistingWord (1, 3) state (0, 1)
+// TODO: Handle first move on the board
+let findPlay (state: gameState) = findMoveOnSquare (3, 0) state
