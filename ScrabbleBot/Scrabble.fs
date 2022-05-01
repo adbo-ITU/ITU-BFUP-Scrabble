@@ -88,13 +88,14 @@ module Scrabble =
 
         let rec aux (st: State.state) =
             let testHand =
-                MultiSet.ofList [ 14u
-                                  5u
-                                  19u
-                                  19u
-                                  9u
+                MultiSet.ofList [ // 14u
+                                  //   5u
+                                  //   19u
+                                  //   19u
+                                  //   9u
                                   14u
                                   7u ]
+            // 21u ]
 
             let testPlacedTiles =
                 Map.ofList [ ((0, 0), (6u, ('F', 4)))
@@ -105,10 +106,10 @@ module Scrabble =
                              ((1, 2), (9u, ('I', 1)))
                              ((4, -1), (4u, ('S', 1)))
                              ((4, 0), (4u, ('E', 1)))
-                             ((4, 1), (1u, ('A', 1)))
-                             ((0, 4), (4u, ('S', 1)))
-                             ((1, 4), (4u, ('E', 1)))
-                             ((2, 4), (1u, ('A', 1)))]
+                             ((4, 1), (1u, ('A', 1))) ]
+            //  ((0, 4), (4u, ('S', 1)))
+            //  ((1, 4), (4u, ('E', 1)))
+            //  ((2, 4), (1u, ('A', 1))) ]
 
             let botGameState =
                 { State.toBotGameState st pieces with
