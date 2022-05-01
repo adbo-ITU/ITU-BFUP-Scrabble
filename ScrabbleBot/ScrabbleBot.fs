@@ -16,7 +16,7 @@ type gameState =
 type MoveState =
     { cursor: coord
       dict: ScrabbleUtil.Dictionary.Dict
-      wordAcc: char list }
+      wordAcc: list<coord * (uint32 * (char * int))> }
 
 // TODO: We do not account for single-letter words as the first move on the board
 
@@ -61,7 +61,8 @@ let rec foo (state: gameState) wordAcc =
 
 let findWord (state: gameState) startLetter =
     let convertResultToWord result =
-        let sentinelIndex = List.findIndex (fun ch -> ch = Dictionary.SentinelChar) result
+        let sentinelIndex =
+            List.findIndex (fun ch -> ch = Dictionary.SentinelChar) result
 
         let seq = Seq.ofList result
 
@@ -70,7 +71,8 @@ let findWord (state: gameState) startLetter =
             |> Seq.rev
             |> Seq.toList
 
-        let first = Seq.skip (sentinelIndex + 1) seq |> Seq.toList
+        let first =
+            Seq.skip (sentinelIndex + 1) seq |> Seq.toList
 
         first @ second
 
@@ -115,21 +117,25 @@ let findAllPossibleSpawnPositions (state: gameState) =
         (Map.keys state.placedTiles)
 
 let rec findStartOfWord (curPos: coord) (state: gameState) (invertedDirectionVector: coord) =
-    let nextPos = Utils.addCoords curPos invertedDirectionVector
+    let nextPos =
+        Utils.addCoords curPos invertedDirectionVector
 
     match Map.containsKey nextPos state.placedTiles with
     | true -> findStartOfWord nextPos state invertedDirectionVector
     | false -> curPos
 
 let getLetter pos state =
+    debugPrint (sprintf "getLetter: %A\n" pos)
     Map.find pos state.placedTiles |> snd |> fst
 
 /// Should be used to "start" a word with what is already placed on the board.
 /// Should only be used when direction is right or down!
 let initMoveWithExistingWord (pos: coord) (state: gameState) (directionVector: int * int) =
-    let invertedDirectionVector = (-(fst directionVector), -(snd directionVector))
+    let invertedDirectionVector =
+        (-(fst directionVector), -(snd directionVector))
 
-    let startPos = findStartOfWord pos state invertedDirectionVector
+    let startPos =
+        findStartOfWord pos state invertedDirectionVector
 
     let numStartLetters =
         match directionVector with
@@ -153,7 +159,7 @@ let initMoveWithExistingWord (pos: coord) (state: gameState) (directionVector: i
     let startMoveState =
         { cursor = Utils.addCoords startPos directionVector
           dict = startDict
-          wordAcc = [ firstLetter ] }
+          wordAcc = [] }
 
     // We now add all the next letters in the word to the move state.
     let folder (moveState: MoveState) =
@@ -166,8 +172,7 @@ let initMoveWithExistingWord (pos: coord) (state: gameState) (directionVector: i
         |> Option.map (fun (_, subDict) ->
             { moveState with
                 dict = subDict
-                cursor = Utils.addCoords moveState.cursor directionVector
-                wordAcc = nextLetter :: moveState.wordAcc })
+                cursor = Utils.addCoords moveState.cursor directionVector })
 
     let initialMoveState =
         Seq.fold (fun acc _ -> Utils.flatMap folder acc) (Some startMoveState) (Seq.init (numStartLetters - 1) id)
@@ -208,9 +213,14 @@ let validateTilePlacement (pos: coord) (letter: char) (state: gameState) (direct
                 debugPrint (sprintf "Result from STEP with %A: %A\n" letter res)
                 res
 
-        let coordsToCheckAbove = coordsBetween startPos pos (dx, dy) |> Seq.rev
+        let coordsToCheckAbove =
+            coordsBetween startPos pos (dx, dy) |> Seq.rev
+
         debugPrint (sprintf "Coordinates above pos %A: %A\n" pos coordsToCheckAbove)
-        let coordsToCheckBelow = coordsBetween pos endPos (dx, dy) |> Seq.skip 1
+
+        let coordsToCheckBelow =
+            coordsBetween pos endPos (dx, dy) |> Seq.skip 1
+
         debugPrint (sprintf "Coordinates below pos %A: %A\n" pos coordsToCheckBelow)
 
         let acc =
@@ -239,18 +249,23 @@ let validateTilePlacement (pos: coord) (letter: char) (state: gameState) (direct
 
 let rec tryFindValidMove (state: gameState) (moveState: MoveState) (direction: coord) =
     let handleTileId tileId =
-        let handleLetter (ch, _) =
+        let handleLetter (ch, points) =
             debugPrint (sprintf "MOVE STATE Letter: %A. State: %A\n" ch moveState)
 
             // TODO: Optimise. Don't calculate this before dict.step gives Some
             let isLegalPlacement =
-                let b = validateTilePlacement moveState.cursor ch state direction
+                let b =
+                    validateTilePlacement moveState.cursor ch state direction
+
                 debugPrint (sprintf "Found %s placement!\n" (if b then "a legal" else "an illegal"))
                 b
 
             let stepAndContinue =
-                let res = ScrabbleUtil.Dictionary.step ch moveState.dict
-                let endPos = findStartOfWord moveState.cursor state direction
+                let res =
+                    ScrabbleUtil.Dictionary.step ch moveState.dict
+
+                let endPos =
+                    findStartOfWord moveState.cursor state direction
 
                 let coords =
                     coordsBetween moveState.cursor endPos direction
@@ -265,22 +280,28 @@ let rec tryFindValidMove (state: gameState) (moveState: MoveState) (direction: c
                     match acc with
                     | Some (_, moveState') ->
                         let letter = getLetter curPos state
-                        let res' = ScrabbleUtil.Dictionary.step letter moveState'.dict
+
+                        let res' =
+                            ScrabbleUtil.Dictionary.step letter moveState'.dict
+
                         debugPrint (sprintf "Hit already exisiting tile with letter %A.\n" letter)
                         expandOption res' { moveState' with cursor = Utils.addCoords moveState'.cursor direction }
                     | None -> None
 
                 Seq.fold folder (expandOption res moveState) coords
 
+            let placement =
+                (moveState.cursor, (tileId, (ch, points)))
+
             match stepAndContinue with
-            | Some (isWord, _) when isWord && isLegalPlacement -> Some(ch :: moveState.wordAcc)
+            | Some (isWord, _) when isWord && isLegalPlacement -> Some(placement :: moveState.wordAcc)
             | Some (_, moveState') when isLegalPlacement ->
                 tryFindValidMove
                     { state with hand = MultiSet.removeSingle tileId state.hand }
                     { moveState with
                         dict = moveState'.dict
                         cursor = Utils.addCoords moveState'.cursor direction
-                        wordAcc = ch :: moveState.wordAcc }
+                        wordAcc = placement :: moveState.wordAcc }
                     direction
             | _ -> None
 
@@ -302,7 +323,8 @@ let rec tryFindValidMove (state: gameState) (moveState: MoveState) (direction: c
 let findMoveOnSquare (pos: coord) (state: gameState) =
     // Explore right
     let rightResult =
-        tryFindValidMove state (initMoveWithExistingWord pos state (1, 0)) (1, 0)
+        let direction = (0, 1)
+        tryFindValidMove state (initMoveWithExistingWord pos state direction) direction
 
     // Explore down
     // let moveState = initMoveWithExistingWord pos state (0, 1)
@@ -311,7 +333,19 @@ let findMoveOnSquare (pos: coord) (state: gameState) =
     // Explore up
     // Explore left
 
-    debugPrint (sprintf "Result right: %A" rightResult)
+    // pretty print result
+    let prettifyResult =
+        function
+        | Some (placements) ->
+            Seq.rev placements
+            |> Seq.fold
+                (fun acc placement ->
+                    let (pos, (_tileId, (ch, _points))) = placement
+                    sprintf "%A- %A at %A\n" acc ch pos)
+                "Found move:\n"
+        | None -> "No move found\n"
+
+    debugPrint (sprintf "Result right: %A" (prettifyResult rightResult))
 
 // TODO: Handle outside of board, handle holes in board etc.
 // TODO: use useAllPossibleSpawnPositions to find all possible start locations,
@@ -319,4 +353,4 @@ let findMoveOnSquare (pos: coord) (state: gameState) =
 // TODO: Implement a function to find a move on a given square - will explore
 //       up, down, left, right
 // TODO: Handle first move on the board
-let findPlay (state: gameState) = findMoveOnSquare (3, 0) state
+let findPlay (state: gameState) = findMoveOnSquare (1, 3) state
