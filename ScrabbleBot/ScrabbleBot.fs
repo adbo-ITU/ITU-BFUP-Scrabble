@@ -1,4 +1,4 @@
-﻿module internal ScrabbleBot
+module internal ScrabbleBot
 
 open ScrabbleUtil.DebugPrint
 
@@ -250,7 +250,13 @@ let validateTilePlacement (pos: coord) (letter: char) (state: gameState) (direct
 let rec tryFindValidMove (state: gameState) (moveState: MoveState) (direction: coord) =
     let handleTileId tileId =
         let handleLetter (ch, points) =
-            debugPrint (sprintf "MOVE STATE Letter: %A. State: %A\n" ch moveState)
+            debugPrint (
+                sprintf
+                    "MOVE STATE Letter: %A. Cursor: %A. Word acc: %A\n"
+                    ch
+                    moveState.cursor
+                    (List.map (fun (_, (_, (l, _))) -> l) moveState.wordAcc)
+            )
 
             // TODO: Optimise. Don't calculate this before dict.step gives Some
             let isLegalPlacement =
