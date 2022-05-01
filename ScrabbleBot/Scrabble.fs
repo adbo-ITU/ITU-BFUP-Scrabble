@@ -103,8 +103,9 @@ module Scrabble =
                              ((1, -1), (20u, ('T', 1)))
                              ((1, 1), (11u, ('K', 1)))
                              ((1, 2), (9u, ('I', 1)))
-                             ((5, 1), (4u, ('E', 1)))
-                             ((5, 2), (1u, ('A', 1)))]
+                             ((4, -1), (4u, ('S', 1)))
+                             ((4, 0), (4u, ('E', 1)))
+                             ((4, 1), (1u, ('A', 1)))]
 
             let botGameState =
                 { State.toBotGameState st pieces with
