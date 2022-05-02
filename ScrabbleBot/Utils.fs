@@ -16,8 +16,6 @@ let rotate (step: uint32) input =
 
 let addCoords (a: int * int) (b: int * int) = (fst a + fst b, snd a + snd b)
 
-let invertCoords (a: int * int) = (-(fst a), -(snd a))
-
 let flatMap f opt =
     match opt with
     | Some x -> f x

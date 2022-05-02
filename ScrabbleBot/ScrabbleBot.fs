@@ -126,7 +126,6 @@ let rec findStartOfWord (curPos: coord) (state: gameState) (invertedDirectionVec
     | false -> curPos
 
 let getLetter pos state =
-    debugPrint (sprintf "getLetter: %A\n" pos)
     Map.find pos state.placedTiles |> snd |> fst
 
 /// Should be used to "start" a word with what is already placed on the board.
@@ -219,7 +218,7 @@ let validateTilePlacement (pos: coord) (letter: char) (state: gameState) (direct
                     | curPos' -> getLetter curPos' state
 
                 let res = ScrabbleUtil.Dictionary.step letter dict
-                debugPrint (sprintf "Result from STEP with %A: %A\n" letter res)
+                debugPrint (sprintf "Result from STEP with %A: %A\n" letter (res |> Option.map fst))
                 res
 
         let coordsToCheckAbove =
@@ -290,8 +289,6 @@ let rec tryFindValidMove (state: gameState) (moveState: MoveState) (direction: c
                         | _ -> Some(fst res, { moveState with dict = snd res }))
                     |> Option.map (fun (isWord, ms) -> (isWord, { ms with createdWord = ch :: ms.createdWord }))
 
-                debugPrint (sprintf "IDK: %A - %A\n" ch stepWithTile)
-
                 let stepWithExisting (isWord, moveState') =
                     let endPos =
                         findStartOfWord moveState'.cursor state direction
@@ -300,13 +297,10 @@ let rec tryFindValidMove (state: gameState) (moveState: MoveState) (direction: c
                         coordsBetween moveState'.cursor endPos direction
                         |> Seq.skip 1
 
-                    debugPrint (sprintf "IDK: coords - %A\n" coords)
-
                     let folder acc curPos =
                         match acc with
                         | Some (_, moveState'') ->
                             let letter = getLetter curPos state
-                            debugPrint (sprintf "IDK2: %A - %A - %A\n" letter curPos moveState''.cursor)
 
                             let res' =
                                 ScrabbleUtil.Dictionary.step letter moveState''.dict
