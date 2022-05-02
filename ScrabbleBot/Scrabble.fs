@@ -89,24 +89,21 @@ module Scrabble =
         let rec aux (st: State.state) =
             let testHand =
                 MultiSet.ofList [ 14u
-                                  //   5u
                                   19u
                                   19u
-                                  //   9u
                                   14u
+                                  5u
                                   7u ]
-            // 21u ]
 
             let testPlacedTiles =
                 Map.ofList [ ((1, -1), (20u, ('T', 1)))
-                             ((4, -1), (19u, ('S', 1)))
                              ((0, 0), (6u, ('F', 1)))
                              ((1, 0), (9u, ('I', 1)))
                              ((2, 0), (20u, ('T', 1)))
-                             ((4, 0), (5u, ('E', 1)))
                              ((1, 1), (11u, ('K', 1)))
-                             ((4, 1), (1u, ('A', 1)))
+                             ((5, 1), (5u, ('E', 1)))
                              ((1, 2), (9u, ('I', 1)))
+                             ((5, 2), (1u, ('A', 1)))
                              ((0, 4), (19u, ('S', 1)))
                              ((1, 4), (5u, ('E', 1)))
                              ((2, 4), (1u, ('A', 1))) ]
@@ -116,7 +113,6 @@ module Scrabble =
                     hand = testHand
                     placedTiles = testPlacedTiles }
 
-            // debugPrint (sprintf "STATE: %A\nRESULT: %A\n" botGameState (ScrabbleBot.findWord botGameState 'A'))
             debugPrint "\n"
             ScrabbleBot.findPlay botGameState
             debugPrint "\n"
