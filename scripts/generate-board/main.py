@@ -71,7 +71,7 @@ def show_board_seed(board):
             id = string.ascii_uppercase.index(char) + 1
             points = 1
             coordinate = (c - CENTER, r - CENTER)
-            tiles.append(f'({coordinate}, ({id}u, ({char}, {points})))')
+            tiles.append(f"({coordinate}, ({id}u, ('{char}', {points})))")
 
     print('[ ' + '; '.join(tiles) + ' ]')
 
