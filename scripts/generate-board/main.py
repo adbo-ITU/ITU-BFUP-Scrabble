@@ -33,7 +33,6 @@ def main():
     for row_index, row in enumerate(data.to_numpy()):
         for col_index, cell in enumerate(row):
             if cell is not None:
-                print(f"cell: {cell}")
                 board[row_index + 1][col_index] = cell.upper()
 
     print()
