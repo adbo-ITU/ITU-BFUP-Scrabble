@@ -8,7 +8,7 @@ Make sure that link sharing has been enabled for the sheet.
 ## Installation
 Haven't tested, but I think it's something like
 ```
-python -m pip install python-dotenv pandas
+python -m pip install python-dotenv pandas openpyxl
 ```
 
 ## Example output
