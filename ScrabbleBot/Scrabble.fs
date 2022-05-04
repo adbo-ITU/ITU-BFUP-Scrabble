@@ -87,41 +87,39 @@ module Scrabble =
     let playGame cstream pieces (st: State.state) =
 
         let rec aux (st: State.state) =
-            Print.printHand pieces (State.hand st)
+            // Print.printHand pieces (State.hand st)
 
-            let testHand = MultiSet.ofList [ 1u; 19u ]
+            // let testHand = MultiSet.ofList [ 1u; 19u ]
 
-            let testPlacedTiles =
-                Map.ofList [ ((-5, 0), (1u, ('A', 1)))
-                             ((-4, 0), (14u, ('N', 1)))
-                             ((-3, 0), (4u, ('D', 1)))
-                             ((-2, 0), (18u, ('R', 1)))
-                             ((-1, 0), (5u, ('E', 1)))
-                             ((0, 0), (1u, ('A', 1))) ]
+            // let testPlacedTiles =
+            //     Map.ofList [ ((-5, 0), (1u, ('A', 1)))
+            //                  ((-4, 0), (14u, ('N', 1)))
+            //                  ((-3, 0), (4u, ('D', 1)))
+            //                  ((-2, 0), (18u, ('R', 1)))
+            //                  ((-1, 0), (5u, ('E', 1)))
+            //                  ((0, 0), (1u, ('A', 1))) ]
 
-            let botGameState =
-                { State.toBotGameState st pieces with
-                    hand = testHand
-                    placedTiles = testPlacedTiles }
+            // let botGameState =
+            //     { State.toBotGameState st pieces with
+            //         hand = testHand
+            //         placedTiles = testPlacedTiles }
 
-            // let botGameState = State.toBotGameState st pieces
+            if State.currentPlayer st = State.ourPlayerNumber st then
+                let botGameState = State.toBotGameState st pieces
+                debugPrint "\n"
+                let foundMove = ScrabbleBot.findPlay botGameState
+                debugPrint "\n"
 
-            debugPrint "\n"
-            let foundMove = ScrabbleBot.findPlay botGameState
-            debugPrint "\n"
+                let action =
+                    match foundMove with
+                    | Some m -> SMPlay m
+                    | None -> SMPass
 
-            let rip = System.Console.ReadLine()
-
-            let action =
-                match foundMove with
-                | Some m -> SMPlay m
-                | None -> SMPass
-
-            debugPrint (sprintf "Player %d -> Server:\n%A\n" (State.ourPlayerNumber st) action) // keep the debug lines. They are useful.
-            send cstream action
+                debugPrint (sprintf "Player %d -> Server:\n%A\n" (State.ourPlayerNumber st) action) // keep the debug lines. They are useful.
+                send cstream action
 
             let msg = recv cstream
-            debugPrint (sprintf "Player %d <- Server:\n%A\n" (State.ourPlayerNumber st) action) // keep the debug lines. They are useful.
+            debugPrint (sprintf "Player %d <- Server:\n" (State.ourPlayerNumber st)) // keep the debug lines. They are useful.
 
             match msg with
             // A successful play was made by us
