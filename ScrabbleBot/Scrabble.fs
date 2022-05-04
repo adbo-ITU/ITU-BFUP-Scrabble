@@ -87,50 +87,39 @@ module Scrabble =
     let playGame cstream pieces (st: State.state) =
 
         let rec aux (st: State.state) =
-            let testHand =
-                MultiSet.ofList [ 14u
-                                  19u
-                                  19u
-                                  14u
-                                  5u
-                                  7u ]
+            // Print.printHand pieces (State.hand st)
 
-            let testPlacedTiles =
-                Map.ofList [ ((1, -1), (20u, ('T', 1)))
-                             ((0, 0), (6u, ('F', 1)))
-                             ((1, 0), (9u, ('I', 1)))
-                             ((2, 0), (20u, ('T', 1)))
-                             ((1, 1), (11u, ('K', 1)))
-                             ((5, 1), (5u, ('E', 1)))
-                             ((1, 2), (9u, ('I', 1)))
-                             ((5, 2), (1u, ('A', 1)))
-                             ((0, 4), (19u, ('S', 1)))
-                             ((1, 4), (5u, ('E', 1)))
-                             ((2, 4), (1u, ('A', 1))) ]
+            // let testHand = MultiSet.ofList [ 1u; 19u ]
 
-            let botGameState =
-                { State.toBotGameState st pieces with
-                    hand = testHand
-                    placedTiles = testPlacedTiles }
+            // let testPlacedTiles =
+            //     Map.ofList [ ((-5, 0), (1u, ('A', 1)))
+            //                  ((-4, 0), (14u, ('N', 1)))
+            //                  ((-3, 0), (4u, ('D', 1)))
+            //                  ((-2, 0), (18u, ('R', 1)))
+            //                  ((-1, 0), (5u, ('E', 1)))
+            //                  ((0, 0), (1u, ('A', 1))) ]
 
-            debugPrint "\n"
-            ScrabbleBot.findPlay botGameState
-            debugPrint "\n"
+            // let botGameState =
+            //     { State.toBotGameState st pieces with
+            //         hand = testHand
+            //         placedTiles = testPlacedTiles }
 
-            Print.printHand pieces (State.hand st)
+            if State.currentPlayer st = State.ourPlayerNumber st then
+                let botGameState = State.toBotGameState st pieces
+                debugPrint "\n"
+                let foundMove = ScrabbleBot.findPlay botGameState
+                debugPrint "\n"
 
-            // remove the force print when you move on from manual input (or when you have learnt the format)
-            forcePrint
-                "Input move (format '(<x-coordinate> <y-coordinate> <piece id><character><point-value> )*', note the absence of space between the last inputs)\n\n"
+                let action =
+                    match foundMove with
+                    | Some m -> SMPlay m
+                    | None -> SMPass
 
-            let input = System.Console.ReadLine()
-            let move = RegEx.parseMove input
-
-            debugPrint (sprintf "Player %d -> Server:\n%A\n" (State.ourPlayerNumber st) move) // keep the debug lines. They are useful.
-            send cstream (SMPlay move)
+                debugPrint (sprintf "Player %d -> Server:\n%A\n" (State.ourPlayerNumber st) action) // keep the debug lines. They are useful.
+                send cstream action
 
             let msg = recv cstream
-            debugPrint (sprintf "Player %d <- Server:\n%A\n" (State.ourPlayerNumber st) move) // keep the debug lines. They are useful.
+            debugPrint (sprintf "Player %d <- Server:\n" (State.ourPlayerNumber st)) // keep the debug lines. They are useful.
 
             match msg with
             // A successful play was made by us
