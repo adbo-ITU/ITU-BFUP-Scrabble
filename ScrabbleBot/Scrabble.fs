@@ -88,12 +88,11 @@ module Scrabble =
 
         let rec aux (st: State.state) =
             let testHand =
-                MultiSet.ofList [ 14u
-                                  19u
-                                  19u
+                MultiSet.ofList [ 21u
                                   14u
                                   5u
-                                  7u ]
+                                  19u
+                                  19u ]
 
             let testPlacedTiles =
                 Map.ofList [ ((1, -1), (20u, ('T', 1)))

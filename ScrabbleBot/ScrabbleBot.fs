@@ -129,7 +129,6 @@ let getLetter pos state =
     Map.find pos state.placedTiles |> snd |> fst
 
 /// Should be used to "start" a word with what is already placed on the board.
-/// Should only be used when direction is right or down!
 let initMoveWithExistingWord (pos: coord) (state: gameState) (directionVector: int * int) =
     let invertedDirectionVector =
         (-(fst directionVector), -(snd directionVector))
@@ -139,8 +138,8 @@ let initMoveWithExistingWord (pos: coord) (state: gameState) (directionVector: i
 
     let numStartLetters =
         match directionVector with
-        | (x, _) when x > 0 -> (fst pos) - (fst startPos)
-        | (_, y) when y > 0 -> (snd pos) - (snd startPos)
+        | (x, _) when x <> 0 -> (fst pos) - (fst startPos) |> abs
+        | (_, y) when y <> 0 -> (snd pos) - (snd startPos) |> abs
         | _ -> failwith "initMoveWithExistingWord: invalid direction vector"
 
     if numStartLetters = 0 then
@@ -156,7 +155,12 @@ let initMoveWithExistingWord (pos: coord) (state: gameState) (directionVector: i
         // move has been made.
         let startDict =
             ScrabbleUtil.Dictionary.step firstLetter state.dict
-            |> Utils.flatMap (fun (_, subDict) -> ScrabbleUtil.Dictionary.reverse subDict)
+            |> Utils.flatMap (fun (isWord, subDict) ->
+                // When going right or down, the first seen letter is the first
+                // of the word. When going left or up, it is the last.
+                match directionVector with
+                | (x, y) when x > 0 || y > 0 -> ScrabbleUtil.Dictionary.reverse subDict
+                | _ -> Some(isWord, subDict))
             |> (function
             | Some (_, s) -> s
             | _ -> failwith "illegal initial board state")
@@ -192,7 +196,7 @@ let initMoveWithExistingWord (pos: coord) (state: gameState) (directionVector: i
 
 let coordsBetween a b dir =
     // We know that one of x or y must always be 0
-    let distance = fst b - fst a + snd b - snd a
+    let distance = fst b - fst a + snd b - snd a |> abs
 
     Seq.init (distance + 1) (fun n ->
         Utils.addCoords
@@ -316,7 +320,17 @@ let rec tryFindValidMove (state: gameState) (moveState: MoveState) (direction: c
 
                     Seq.fold folder (Some(isWord, moveState')) coords
 
-                stepWithTile |> Utils.flatMap stepWithExisting
+                let checkWordIfLeftOrUp (isWord, ms) =
+                    match direction with
+                    | (x, y) when x < 0 || y < 0 ->
+                        match ScrabbleUtil.Dictionary.reverse ms.dict with
+                        | Some (reverseIsWord, _) -> Some(reverseIsWord, ms)
+                        | None -> Some(isWord, ms)
+                    | _ -> Some(isWord, ms)
+
+                stepWithTile
+                |> Utils.flatMap stepWithExisting
+                |> Utils.flatMap checkWordIfLeftOrUp
 
             let placement =
                 (moveState.cursor, (tileId, (ch, points)))
@@ -349,17 +363,25 @@ let rec tryFindValidMove (state: gameState) (moveState: MoveState) (direction: c
     MultiSet.fold folder None state.hand
 
 let findMoveOnSquare (pos: coord) (state: gameState) =
-    // Explore right
-    let rightResult =
-        let direction = (1, 0)
-        tryFindValidMove state (initMoveWithExistingWord pos state direction) direction
+    let directions =
+        [ (-1, 0) // Left
+          (0, -1) // Up
+          (1, 0) // Right
+          (0, 1) ] // Down
 
-    // Explore down
-    // let moveState = initMoveWithExistingWord pos state (0, 1)
+    // TODO: remove me
+    let directions = [ (-1, 0) ]
+
+    let result =
+        List.fold
+            (fun res direction ->
+                match res with
+                | None -> tryFindValidMove state (initMoveWithExistingWord pos state direction) direction
+                | _ -> res)
+            None
+            directions
 
     // TODO: Some opposite direction logic in gaddag
-    // Explore up
-    // Explore left
 
     // pretty print result
     let prettifyResult =
@@ -373,7 +395,7 @@ let findMoveOnSquare (pos: coord) (state: gameState) =
                 "Found move:"
         | None -> "No move found"
 
-    debugPrint (sprintf "Result right: %A" (prettifyResult rightResult))
+    debugPrint (sprintf "Result: %A" (prettifyResult result))
 
 // TODO: Handle outside of board, handle holes in board etc.
 // TODO: use useAllPossibleSpawnPositions to find all possible start locations,
@@ -381,4 +403,4 @@ let findMoveOnSquare (pos: coord) (state: gameState) =
 // TODO: Implement a function to find a move on a given square - will explore
 //       up, down, left, right
 // TODO: Handle first move on the board
-let findPlay (state: gameState) = findMoveOnSquare (3, 0) state
+let findPlay (state: gameState) = findMoveOnSquare (-1, 0) state
