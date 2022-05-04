@@ -21,78 +21,6 @@ type MoveState =
 
 // TODO: We do not account for single-letter words as the first move on the board
 
-let rec foo (state: gameState) wordAcc =
-    ScrabbleUtil.DebugPrint.debugPrint (sprintf "current word acc: %A\n" wordAcc)
-
-    let aux tileId =
-        let lulw (ch, _) =
-            ScrabbleUtil.DebugPrint.debugPrint (sprintf "dict step: %A\n" (ScrabbleUtil.Dictionary.step ch state.dict))
-
-            match ScrabbleUtil.Dictionary.step ch state.dict with
-            | Some (isWord, _) when
-                isWord
-                && not (
-                    List.length wordAcc = 1
-                    && ch = Dictionary.SentinelChar
-                )
-                ->
-                Some(ch :: wordAcc)
-            | Some (_, subDict) ->
-                foo
-                    { state with
-                        dict = subDict
-                        hand = MultiSet.removeSingle tileId state.hand }
-                    (ch :: wordAcc)
-            | None -> None
-
-        let folder acc piece =
-            match acc with
-            | Some (_) -> acc
-            | None -> lulw piece
-
-        let tile = Map.find tileId state.pieces
-        Set.fold folder None tile
-
-    let folder acc tileId _ =
-        match acc with
-        | Some (_) -> acc
-        | None -> aux tileId
-
-    MultiSet.fold folder None state.hand
-
-let findWord (state: gameState) startLetter =
-    let convertResultToWord result =
-        let sentinelIndex =
-            List.findIndex (fun ch -> ch = Dictionary.SentinelChar) result
-
-        let seq = Seq.ofList result
-
-        let second =
-            Seq.take sentinelIndex seq
-            |> Seq.rev
-            |> Seq.toList
-
-        let first =
-            Seq.skip (sentinelIndex + 1) seq |> Seq.toList
-
-        first @ second
-
-    match ScrabbleUtil.Dictionary.step startLetter state.dict with
-    | Some (_, subDict) ->
-        let piecesWithSentinel =
-            Map.add 12345u (Set.ofList [ (Dictionary.SentinelChar, 0) ]) state.pieces
-
-        let handWithSentinel = MultiSet.addSingle 12345u state.hand
-
-        foo
-            { state with
-                dict = subDict
-                pieces = piecesWithSentinel
-                hand = handWithSentinel }
-            [ startLetter ]
-    | None -> None
-    |> Option.map convertResultToWord
-
 let findAdjacentEmptySquares ((x, y): coord) (placedTiles: placedTilesMap) =
     let directionVectors = [ (0, 1); (1, 0); (0, -1); (-1, 0) ]
 
@@ -252,10 +180,11 @@ let rec tryFindValidMove (state: gameState) (moveState: MoveState) (direction: c
         let handleLetter (ch, points) =
             debugPrint (
                 sprintf
-                    "MOVE STATE Letter: %A. Cursor: %A. Word acc: %A\n"
+                    "MOVE STATE Letter: %A. Cursor: %A. Plays: %A. Path: %A\n"
                     ch
                     moveState.cursor
                     (List.map (fun (_, (_, (l, _))) -> l) moveState.moves)
+                    moveState.createdWord
             )
 
             // TODO: Optimise. Don't calculate this before dict.step gives Some
@@ -357,9 +286,6 @@ let findMoveOnSquare (pos: coord) (state: gameState) =
           (1, 0) // Right
           (0, 1) ] // Down
 
-    // TODO: remove me
-    let directions = [ (0, 1) ]
-
     let result =
         List.fold
             (fun res direction ->
@@ -368,8 +294,6 @@ let findMoveOnSquare (pos: coord) (state: gameState) =
                 | _ -> res)
             None
             directions
-
-    // TODO: Some opposite direction logic in gaddag
 
     // pretty print result
     let prettifyResult =
@@ -385,10 +309,17 @@ let findMoveOnSquare (pos: coord) (state: gameState) =
 
     debugPrint (sprintf "Result: %A" (prettifyResult result))
 
+    result
+
 // TODO: Handle outside of board, handle holes in board etc.
 // TODO: use useAllPossibleSpawnPositions to find all possible start locations,
 //       then try to find move on each spawn location.
-// TODO: Implement a function to find a move on a given square - will explore
-//       up, down, left, right
 // TODO: Handle first move on the board
-let findPlay (state: gameState) = findMoveOnSquare (-1, -5) state
+let findPlay (state: gameState) =
+    findAllPossibleSpawnPositions state
+    |> Set.fold
+        (fun acc pos ->
+            match acc with
+            | Some (_) -> acc
+            | None -> findMoveOnSquare pos state)
+        None
