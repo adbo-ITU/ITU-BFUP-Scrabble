@@ -166,8 +166,8 @@ let validateTilePlacement (pos: coord) (letter: char) (state: gameState) (direct
         tileExists (Utils.addCoords pos (dx, dy))
         || tileExists (Utils.addCoords pos (-dx, -dy))
     then
-        let startPos = findStartOfWord pos state (0, -1)
-        let endPos = findStartOfWord pos state (0, 1)
+        let startPos = findStartOfWord pos state (dx, dy)
+        let endPos = findStartOfWord pos state (-dx, -dy)
 
         debugPrint (sprintf "Validating word between %A and %A.\n" startPos endPos)
 
