@@ -194,17 +194,6 @@ let initMoveWithExistingWord (pos: coord) (state: gameState) (directionVector: i
 
         initialMoveState
 
-let coordsBetween a b dir =
-    // We know that one of x or y must always be 0
-    let distance = fst b - fst a + snd b - snd a |> abs
-
-    Seq.init (distance + 1) (fun n ->
-        Utils.addCoords
-            (a)
-            (match dir with
-             | (0, _) -> (0, n)
-             | _ -> (n, 0)))
-
 let validateTilePlacement (pos: coord) (letter: char) (state: gameState) (direction: coord) =
     let tileExists pos = Map.containsKey pos state.placedTiles
 
@@ -225,13 +214,12 @@ let validateTilePlacement (pos: coord) (letter: char) (state: gameState) (direct
                 debugPrint (sprintf "Result from STEP with %A: %A\n" letter (res |> Option.map fst))
                 res
 
-        let coordsToCheckAbove =
-            coordsBetween startPos pos (dx, dy) |> Seq.rev
+        let coordsToCheckAbove = Utils.coordsBetween pos startPos
 
         debugPrint (sprintf "Coordinates above pos %A: %A\n" pos coordsToCheckAbove)
 
         let coordsToCheckBelow =
-            coordsBetween pos endPos (dx, dy) |> Seq.skip 1
+            Utils.coordsBetween pos endPos |> Seq.skip 1
 
         debugPrint (sprintf "Coordinates below pos %A: %A\n" pos coordsToCheckBelow)
 
@@ -298,7 +286,7 @@ let rec tryFindValidMove (state: gameState) (moveState: MoveState) (direction: c
                         findStartOfWord moveState'.cursor state direction
 
                     let coords =
-                        coordsBetween moveState'.cursor endPos direction
+                        Utils.coordsBetween moveState'.cursor endPos
                         |> Seq.skip 1
 
                     let folder acc curPos =
@@ -370,7 +358,7 @@ let findMoveOnSquare (pos: coord) (state: gameState) =
           (0, 1) ] // Down
 
     // TODO: remove me
-    let directions = [ (-1, 0) ]
+    let directions = [ (0, 1) ]
 
     let result =
         List.fold
@@ -403,4 +391,4 @@ let findMoveOnSquare (pos: coord) (state: gameState) =
 // TODO: Implement a function to find a move on a given square - will explore
 //       up, down, left, right
 // TODO: Handle first move on the board
-let findPlay (state: gameState) = findMoveOnSquare (-1, 0) state
+let findPlay (state: gameState) = findMoveOnSquare (-1, -5) state
