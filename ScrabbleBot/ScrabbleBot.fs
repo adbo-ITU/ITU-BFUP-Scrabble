@@ -187,13 +187,30 @@ let rec tryFindValidMove (state: gameState) (moveState: MoveState) (direction: c
                     moveState.createdWord
             )
 
+            let isWithinBounds =
+                match state.board.squares moveState.cursor with
+                | StateMonad.Failure sm ->
+                    debugPrint (sprintf "StateMonad failure: %A\n" sm)
+                    false
+                | StateMonad.Success sm ->
+                    match sm with
+                    | Some _ -> true
+                    | None -> false
+
             // TODO: Optimise. Don't calculate this before dict.step gives Some
             let isLegalPlacement =
-                let b =
+                let isValid =
                     validateTilePlacement moveState.cursor ch state direction
 
-                debugPrint (sprintf "Found %s placement!\n" (if b then "a legal" else "an illegal"))
-                b
+                debugPrint (
+                    sprintf
+                        "%s placement for letter '%c' at pos %A\n"
+                        (if isValid then "LEGAL" else "ILLEGAL")
+                        ch
+                        moveState.cursor
+                )
+
+                isValid && isWithinBounds
 
             let stepAndContinue =
                 let expandOption res' (moveState': MoveState) =
@@ -307,7 +324,7 @@ let findMoveOnSquare (pos: coord) (state: gameState) =
                 "Found move:"
         | None -> "No move found"
 
-    debugPrint (sprintf "Result: %A" (prettifyResult result))
+    debugPrint (sprintf "Result: %A\n" (prettifyResult result))
 
     result
 
