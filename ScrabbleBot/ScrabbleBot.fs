@@ -142,14 +142,35 @@ let validateTilePlacement (pos: coord) (letter: char) (state: gameState) (direct
                 debugPrint (sprintf "Result from STEP with %A: %A\n" letter (res |> Option.map fst))
                 res
 
-        let coordsToCheckAbove = Utils.coordsBetween pos startPos
+        let coordsToLetters coords =
+            Seq.map
+                (fun x ->
+                    (Option.defaultValue (0u, ('?', 0)) (Map.tryFind x state.placedTiles)
+                     |> snd
+                     |> fst))
+                coords
 
-        debugPrint (sprintf "Coordinates above pos %A: %A\n" pos coordsToCheckAbove)
+        let coordsToCheckAbove =
+            Utils.coordsBetween pos startPos
+
+        debugPrint (
+            sprintf
+                "Coordinates above pos %A: %A, corresponding to the letters %A\n"
+                pos
+                coordsToCheckAbove
+                (coordsToLetters coordsToCheckAbove)
+        )
 
         let coordsToCheckBelow =
             Utils.coordsBetween pos endPos |> Seq.skip 1
 
-        debugPrint (sprintf "Coordinates below pos %A: %A\n" pos coordsToCheckBelow)
+        debugPrint (
+            sprintf
+                "Coordinates below pos %A: %A, corresponding to the letters %A\n"
+                pos
+                coordsToCheckBelow
+                (coordsToLetters coordsToCheckBelow)
+        )
 
         let acc =
             Seq.fold folder (Some(false, state.dict)) coordsToCheckAbove
