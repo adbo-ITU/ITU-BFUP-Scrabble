@@ -46,8 +46,7 @@ let findAllPossibleSpawnPositions (state: gameState) =
         (Map.keys state.placedTiles)
 
 let rec findStartOfWord (curPos: coord) (state: gameState) (invertedDirectionVector: coord) =
-    let nextPos =
-        Utils.addCoords curPos invertedDirectionVector
+    let nextPos = Utils.addCoords curPos invertedDirectionVector
 
     match Map.containsKey nextPos state.placedTiles with
     | true -> findStartOfWord nextPos state invertedDirectionVector
@@ -58,11 +57,9 @@ let getLetter pos state =
 
 /// Should be used to "start" a word with what is already placed on the board.
 let initMoveWithExistingWord (pos: coord) (state: gameState) (directionVector: int * int) =
-    let invertedDirectionVector =
-        (-(fst directionVector), -(snd directionVector))
+    let invertedDirectionVector = (-(fst directionVector), -(snd directionVector))
 
-    let startPos =
-        findStartOfWord pos state invertedDirectionVector
+    let startPos = findStartOfWord pos state invertedDirectionVector
 
     let numStartLetters =
         match directionVector with
@@ -150,8 +147,7 @@ let validateTilePlacement (pos: coord) (letter: char) (state: gameState) (direct
                      |> fst))
                 coords
 
-        let coordsToCheckAbove =
-            Utils.coordsBetween pos startPos
+        let coordsToCheckAbove = Utils.coordsBetween pos startPos
 
         debugPrint (
             sprintf
@@ -161,8 +157,7 @@ let validateTilePlacement (pos: coord) (letter: char) (state: gameState) (direct
                 (coordsToLetters coordsToCheckAbove)
         )
 
-        let coordsToCheckBelow =
-            Utils.coordsBetween pos endPos |> Seq.skip 1
+        let coordsToCheckBelow = Utils.coordsBetween pos endPos |> Seq.skip 1
 
         debugPrint (
             sprintf
@@ -196,6 +191,9 @@ let validateTilePlacement (pos: coord) (letter: char) (state: gameState) (direct
     else
         true
 
+let createdWordIsLongerThan a b =
+    List.length a.createdWord > List.length b.createdWord
+
 let rec tryFindValidMove (state: gameState) (moveState: MoveState) (direction: coord) =
     let handleTileId tileId =
         let handleLetter (ch, points) =
@@ -220,8 +218,7 @@ let rec tryFindValidMove (state: gameState) (moveState: MoveState) (direction: c
 
             // TODO: Optimise. Don't calculate this before dict.step gives Some
             let isLegalPlacement =
-                let isValid =
-                    validateTilePlacement moveState.cursor ch state direction
+                let isValid = validateTilePlacement moveState.cursor ch state direction
 
                 debugPrint (
                     sprintf
@@ -249,8 +246,7 @@ let rec tryFindValidMove (state: gameState) (moveState: MoveState) (direction: c
                     |> Option.map (fun (isWord, ms) -> (isWord, { ms with createdWord = ch :: ms.createdWord }))
 
                 let stepWithExisting (isWord, moveState') =
-                    let endPos =
-                        findStartOfWord moveState'.cursor state direction
+                    let endPos = findStartOfWord moveState'.cursor state direction
 
                     let coords =
                         Utils.coordsBetween moveState'.cursor endPos
@@ -261,8 +257,7 @@ let rec tryFindValidMove (state: gameState) (moveState: MoveState) (direction: c
                         | Some (_, moveState'') ->
                             let letter = getLetter curPos state
 
-                            let res' =
-                                ScrabbleUtil.Dictionary.step letter moveState''.dict
+                            let res' = ScrabbleUtil.Dictionary.step letter moveState''.dict
 
                             debugPrint (sprintf "Hit already exisiting tile with letter %A.\n" letter)
 
@@ -287,33 +282,48 @@ let rec tryFindValidMove (state: gameState) (moveState: MoveState) (direction: c
                 |> Utils.flatMap stepWithExisting
                 |> Utils.flatMap checkWordIfLeftOrUp
 
-            let placement =
-                (moveState.cursor, (tileId, (ch, points)))
+            let placement = (moveState.cursor, (tileId, (ch, points)))
+
+            let updateState s =
+                { s with hand = MultiSet.removeSingle tileId s.hand }
+
+            let updateMoveState s =
+                { s with
+                    dict = s.dict
+                    cursor = Utils.addCoords s.cursor direction
+                    moves = placement :: s.moves }
 
             match stepAndContinue with
-            | Some (isWord, moveState') when isWord && isLegalPlacement -> Some(placement :: moveState'.moves)
+            | Some (isWord, moveState') when isWord && isLegalPlacement ->
+                let next =
+                    tryFindValidMove (updateState state) (updateMoveState moveState') direction
+
+                match next with
+                | Some (ms) when createdWordIsLongerThan ms moveState' -> next
+                | _ -> Some { moveState' with moves = placement :: moveState'.moves }
+
             | Some (_, moveState') when isLegalPlacement ->
-                tryFindValidMove
-                    { state with hand = MultiSet.removeSingle tileId state.hand }
-                    { moveState' with
-                        dict = moveState'.dict
-                        cursor = Utils.addCoords moveState'.cursor direction
-                        moves = placement :: moveState'.moves }
-                    direction
+                tryFindValidMove (updateState state) (updateMoveState moveState') direction
             | _ -> None
 
         let folder acc piece =
-            match acc with
-            | Some (_) -> acc
-            | None -> handleLetter piece
+            let res = handleLetter piece
+
+            match (res, acc) with
+            | (Some (newRes), Some (oldRes)) when createdWordIsLongerThan newRes oldRes -> res
+            | (Some (_), None) -> res
+            | _ -> acc
 
         let tile = Map.find tileId state.pieces
         Set.fold folder None tile
 
     let folder acc tileId _ =
-        match acc with
-        | Some (_) -> acc
-        | None -> handleTileId tileId
+        let res = handleTileId tileId
+
+        match (res, acc) with
+        | (Some (newRes), Some (oldRes)) when createdWordIsLongerThan newRes oldRes -> res
+        | (Some (_), None) -> res
+        | _ -> acc
 
     MultiSet.fold folder None state.hand
 
@@ -327,8 +337,16 @@ let findMoveOnSquare (pos: coord) (state: gameState) =
     let result =
         List.fold
             (fun res direction ->
-                match res with
-                | None -> tryFindValidMove state (initMoveWithExistingWord pos state direction) direction
+                let move =
+                    tryFindValidMove state (initMoveWithExistingWord pos state direction) direction
+
+                match (move, res) with
+                | (Some (newMove), Some (oldMove)) when createdWordIsLongerThan newMove oldMove ->
+                    debugPrint (sprintf "Found better move in another direction.\n")
+                    move
+                | (Some (_), None) ->
+                    debugPrint (sprintf "Found a move in some direction.\n")
+                    move
                 | _ -> res)
             None
             directions
@@ -345,7 +363,7 @@ let findMoveOnSquare (pos: coord) (state: gameState) =
                 "Found move:"
         | None -> "No move found"
 
-    debugPrint (sprintf "Result: %A\n" (prettifyResult result))
+    //debugPrint (sprintf "Result: %A\n" (prettifyResult result))
 
     result
 
@@ -357,7 +375,17 @@ let findPlay (state: gameState) =
     findAllPossibleSpawnPositions state
     |> Set.fold
         (fun acc pos ->
-            match acc with
-            | Some (_) -> acc
-            | None -> findMoveOnSquare pos state)
+            let play = findMoveOnSquare pos state
+
+            match (play, acc) with
+            | (Some (newPlay), Some (oldPlay)) when createdWordIsLongerThan newPlay oldPlay ->
+                debugPrint (sprintf "Found a new play: %A longer than the current play: %A!\n\n" newPlay oldPlay)
+                play
+            | (Some (newPlay), None) ->
+                debugPrint (sprintf "This is the first play we've found: %A!\n\n" newPlay)
+                play
+            | _ ->
+                debugPrint ("Couldn't find a new play.\n\n")
+                acc)
         None
+    |> Option.map (fun ms -> ms.moves)
