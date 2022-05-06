@@ -1,4 +1,4 @@
-﻿module internal ScrabbleBot
+module internal ScrabbleBot
 
 open ScrabbleUtil.DebugPrint
 
@@ -135,9 +135,7 @@ let validateTilePlacement (pos: coord) (letter: char) (state: gameState) (direct
                     | curPos' when curPos' = pos -> letter
                     | curPos' -> getLetter curPos' state
 
-                let res = ScrabbleUtil.Dictionary.step letter dict
-                debugPrint (sprintf "Result from STEP with %A: %A\n" letter (res |> Option.map fst))
-                res
+                ScrabbleUtil.Dictionary.step letter dict
 
         let coordsToLetters coords =
             Seq.map
@@ -148,24 +146,7 @@ let validateTilePlacement (pos: coord) (letter: char) (state: gameState) (direct
                 coords
 
         let coordsToCheckAbove = Utils.coordsBetween pos startPos
-
-        debugPrint (
-            sprintf
-                "Coordinates above pos %A: %A, corresponding to the letters %A\n"
-                pos
-                coordsToCheckAbove
-                (coordsToLetters coordsToCheckAbove)
-        )
-
         let coordsToCheckBelow = Utils.coordsBetween pos endPos |> Seq.skip 1
-
-        debugPrint (
-            sprintf
-                "Coordinates below pos %A: %A, corresponding to the letters %A\n"
-                pos
-                coordsToCheckBelow
-                (coordsToLetters coordsToCheckBelow)
-        )
 
         let acc =
             Seq.fold folder (Some(false, state.dict)) coordsToCheckAbove
@@ -184,9 +165,6 @@ let validateTilePlacement (pos: coord) (letter: char) (state: gameState) (direct
     then
         let startPos = findStartOfWord pos state (dx, dy)
         let endPos = findStartOfWord pos state (-dx, -dy)
-
-        debugPrint (sprintf "Validating word between %A and %A.\n" startPos endPos)
-
         isValidWord startPos endPos
     else
         true
@@ -197,15 +175,6 @@ let createdWordIsLongerThan a b =
 let rec tryFindValidMove (state: gameState) (moveState: MoveState) (direction: coord) =
     let handleTileId tileId =
         let handleLetter (ch, points) =
-            debugPrint (
-                sprintf
-                    "MOVE STATE Letter: %A. Cursor: %A. Plays: %A. Path: %A\n"
-                    ch
-                    moveState.cursor
-                    (List.map (fun (_, (_, (l, _))) -> l) moveState.moves)
-                    moveState.createdWord
-            )
-
             let isWithinBounds =
                 match state.board.squares moveState.cursor with
                 | StateMonad.Failure sm ->
@@ -219,15 +188,6 @@ let rec tryFindValidMove (state: gameState) (moveState: MoveState) (direction: c
             // TODO: Optimise. Don't calculate this before dict.step gives Some
             let isLegalPlacement =
                 let isValid = validateTilePlacement moveState.cursor ch state direction
-
-                debugPrint (
-                    sprintf
-                        "%s placement for letter '%c' at pos %A\n"
-                        (if isValid then "LEGAL" else "ILLEGAL")
-                        ch
-                        moveState.cursor
-                )
-
                 isValid && isWithinBounds
 
             let stepAndContinue =
@@ -257,12 +217,8 @@ let rec tryFindValidMove (state: gameState) (moveState: MoveState) (direction: c
                         | Some (_, moveState'') ->
                             let letter = getLetter curPos state
 
-                            let res' = ScrabbleUtil.Dictionary.step letter moveState''.dict
-
-                            debugPrint (sprintf "Hit already exisiting tile with letter %A.\n" letter)
-
                             expandOption
-                                res'
+                                (ScrabbleUtil.Dictionary.step letter moveState''.dict)
                                 { moveState'' with
                                     cursor = Utils.addCoords moveState''.cursor direction
                                     createdWord = letter :: moveState''.createdWord }
