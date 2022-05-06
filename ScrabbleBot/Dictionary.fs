@@ -1,3 +1,6 @@
+// After submission for Assignment 4, this module was tinkered with a lot in
+// collaboration with albn@itu.dk, so if some parts are quite similar, that's
+// why. Just to have it in writing and to make clear it's not plagiarism ;)
 module Dictionary
 
 type Item =
