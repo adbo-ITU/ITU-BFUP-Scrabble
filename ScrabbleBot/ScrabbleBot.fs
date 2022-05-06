@@ -1,4 +1,4 @@
-module internal ScrabbleBot
+﻿module internal ScrabbleBot
 
 open ScrabbleUtil.DebugPrint
 
@@ -150,8 +150,7 @@ let validateTilePlacement (pos: coord) (letter: char) (state: gameState) (direct
                      |> fst))
                 coords
 
-        let coordsToCheckAbove =
-            Utils.coordsBetween pos startPos
+        let coordsToCheckAbove = Utils.coordsBetween pos startPos
 
         debugPrint (
             sprintf
@@ -187,8 +186,13 @@ let validateTilePlacement (pos: coord) (letter: char) (state: gameState) (direct
         tileExists (Utils.addCoords pos (dx, dy))
         || tileExists (Utils.addCoords pos (-dx, -dy))
     then
-        let startPos = findStartOfWord pos state (dx, dy)
-        let endPos = findStartOfWord pos state (-dx, -dy)
+        let (startDir, endDir) =
+            match ((dx, dy), (-dx, -dy)) with
+            | (l, r) when l < r -> (l, r)
+            | (l, r) -> (r, l)
+
+        let startPos = findStartOfWord pos state startDir
+        let endPos = findStartOfWord pos state endDir
 
         debugPrint (sprintf "Validating word between %A and %A.\n" startPos endPos)
 
