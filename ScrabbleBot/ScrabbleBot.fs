@@ -19,8 +19,6 @@ type MoveState =
       moves: list<coord * (uint32 * (char * int))>
       createdWord: list<char> }
 
-// TODO: We do not account for single-letter words as the first move on the board
-
 let findAdjacentEmptySquares ((x, y): coord) (placedTiles: placedTilesMap) =
     let directionVectors = [ (0, 1); (1, 0); (0, -1); (-1, 0) ]
 
@@ -36,14 +34,18 @@ let findAdjacentEmptySquares ((x, y): coord) (placedTiles: placedTilesMap) =
 
 /// Returns a set of all squares on the board that are empty and adjacent to a
 /// placed tile.
-// TODO: Handle outside of board, handle holes in board etc.
 let findAllPossibleSpawnPositions (state: gameState) =
-    Seq.fold
-        (fun acc pos ->
-            findAdjacentEmptySquares pos state.placedTiles
-            |> List.fold (fun acc' adj -> Set.add adj acc') acc)
-        Set.empty
-        (Map.keys state.placedTiles)
+    let locations =
+        Seq.fold
+            (fun acc pos ->
+                findAdjacentEmptySquares pos state.placedTiles
+                |> List.fold (fun acc' adj -> Set.add adj acc') acc)
+            Set.empty
+            (Map.keys state.placedTiles)
+
+    match Set.count locations with
+    | s when s > 0 -> locations
+    | _ -> Set.ofList [ (0, 0) ]
 
 let rec findStartOfWord (curPos: coord) (state: gameState) (invertedDirectionVector: coord) =
     let nextPos = Utils.addCoords curPos invertedDirectionVector
@@ -163,8 +165,13 @@ let validateTilePlacement (pos: coord) (letter: char) (state: gameState) (direct
         tileExists (Utils.addCoords pos (dx, dy))
         || tileExists (Utils.addCoords pos (-dx, -dy))
     then
-        let startPos = findStartOfWord pos state (dx, dy)
-        let endPos = findStartOfWord pos state (-dx, -dy)
+        let (startDir, endDir) =
+            match ((dx, dy), (-dx, -dy)) with
+            | (l, r) when l < r -> (l, r)
+            | (l, r) -> (r, l)
+
+        let startPos = findStartOfWord pos state startDir
+        let endPos = findStartOfWord pos state endDir
         isValidWord startPos endPos
     else
         true
@@ -191,9 +198,8 @@ let rec tryFindValidMove (state: gameState) (moveState: MoveState) (direction: c
                     | Some _ -> true
                     | None -> false
 
-            // TODO: Optimise. Don't calculate this before dict.step gives Some
-            let isLegalPlacement =
-                let isValid = validateTilePlacement moveState.cursor ch state direction
+            let validatePlacement ms =
+                let isValid = validateTilePlacement ms.cursor ch state direction
                 isValid && isWithinBounds
 
             let stepAndContinue =
@@ -205,10 +211,14 @@ let rec tryFindValidMove (state: gameState) (moveState: MoveState) (direction: c
                 let stepWithTile =
                     ScrabbleUtil.Dictionary.step ch moveState.dict
                     |> Utils.flatMap (fun res ->
-                        // If this is the first tile to be looked at, we need to use reverse
-                        match List.length moveState.createdWord with
-                        | 0 -> expandOption (ScrabbleUtil.Dictionary.reverse (snd res)) moveState
-                        | _ -> Some(fst res, { moveState with dict = snd res }))
+                        let fallback = Some(fst res, { moveState with dict = snd res })
+                        // If this is the first tile to be looked at (going right or down), we need to use reverse
+                        match direction with
+                        | (x, y) when x > 0 || y > 0 ->
+                            match List.length moveState.createdWord with
+                            | 0 -> expandOption (ScrabbleUtil.Dictionary.reverse (snd res)) moveState
+                            | _ -> fallback
+                        | _ -> fallback)
                     |> Option.map (fun (isWord, ms) -> (isWord, { ms with createdWord = ch :: ms.createdWord }))
 
                 let stepWithExisting (isWord, moveState') =
@@ -243,6 +253,7 @@ let rec tryFindValidMove (state: gameState) (moveState: MoveState) (direction: c
                 stepWithTile
                 |> Utils.flatMap stepWithExisting
                 |> Utils.flatMap checkWordIfLeftOrUp
+                |> Option.map (fun s -> (s, validatePlacement moveState))
 
             let placement = (moveState.cursor, (tileId, (ch, points)))
 
@@ -256,7 +267,7 @@ let rec tryFindValidMove (state: gameState) (moveState: MoveState) (direction: c
                     moves = placement :: s.moves }
 
             match stepAndContinue with
-            | Some (isWord, moveState') when isWord && isLegalPlacement ->
+            | Some ((isWord, moveState'), isLegalPlacement) when isWord && isLegalPlacement ->
                 let next =
                     tryFindValidMove (updateState state) (updateMoveState moveState') direction
 
@@ -264,7 +275,7 @@ let rec tryFindValidMove (state: gameState) (moveState: MoveState) (direction: c
                 | Some (ms) when createdWordIsLongerThan ms moveState' -> next
                 | _ -> Some { moveState' with moves = placement :: moveState'.moves }
 
-            | Some (_, moveState') when isLegalPlacement ->
+            | Some ((_, moveState'), isLegalPlacement) when isLegalPlacement ->
                 tryFindValidMove (updateState state) (updateMoveState moveState') direction
             | _ -> None
 
@@ -294,10 +305,6 @@ let findMoveOnSquare (pos: coord) (state: gameState) =
 
     result
 
-// TODO: Handle outside of board, handle holes in board etc.
-// TODO: use useAllPossibleSpawnPositions to find all possible start locations,
-//       then try to find move on each spawn location.
-// TODO: Handle first move on the board
 let findPlay (state: gameState) =
     findAllPossibleSpawnPositions state
     |> Set.fold (fun acc pos -> keepBestResult (findMoveOnSquare pos state) acc) None
