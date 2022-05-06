@@ -19,8 +19,6 @@ type MoveState =
       moves: list<coord * (uint32 * (char * int))>
       createdWord: list<char> }
 
-// TODO: We do not account for single-letter words as the first move on the board
-
 let findAdjacentEmptySquares ((x, y): coord) (placedTiles: placedTilesMap) =
     let directionVectors = [ (0, 1); (1, 0); (0, -1); (-1, 0) ]
 
@@ -36,7 +34,6 @@ let findAdjacentEmptySquares ((x, y): coord) (placedTiles: placedTilesMap) =
 
 /// Returns a set of all squares on the board that are empty and adjacent to a
 /// placed tile.
-// TODO: Handle outside of board, handle holes in board etc.
 let findAllPossibleSpawnPositions (state: gameState) =
     let locations =
         Seq.fold
@@ -364,10 +361,6 @@ let findMoveOnSquare (pos: coord) (state: gameState) =
 
     result
 
-// TODO: Handle outside of board, handle holes in board etc.
-// TODO: use useAllPossibleSpawnPositions to find all possible start locations,
-//       then try to find move on each spawn location.
-// TODO: Handle first move on the board
 let findPlay (state: gameState) =
     findAllPossibleSpawnPositions state
     |> Set.fold
