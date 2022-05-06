@@ -222,17 +222,16 @@ let rec tryFindValidMove (state: gameState) (moveState: MoveState) (direction: c
                     | Some _ -> true
                     | None -> false
 
-            // TODO: Optimise. Don't calculate this before dict.step gives Some
-            let isLegalPlacement =
+            let validatePlacement ms =
                 let isValid =
-                    validateTilePlacement moveState.cursor ch state direction
+                    validateTilePlacement ms.cursor ch state direction
 
                 debugPrint (
                     sprintf
                         "%s placement for letter '%c' at pos %A\n"
                         (if isValid then "LEGAL" else "ILLEGAL")
                         ch
-                        moveState.cursor
+                        ms.cursor
                 )
 
                 isValid && isWithinBounds
@@ -295,13 +294,15 @@ let rec tryFindValidMove (state: gameState) (moveState: MoveState) (direction: c
                 stepWithTile
                 |> Utils.flatMap stepWithExisting
                 |> Utils.flatMap checkWordIfLeftOrUp
+                |> Option.map (fun s -> (s, validatePlacement moveState))
 
             let placement =
                 (moveState.cursor, (tileId, (ch, points)))
 
             match stepAndContinue with
-            | Some (isWord, moveState') when isWord && isLegalPlacement -> Some(placement :: moveState'.moves)
-            | Some (_, moveState') when isLegalPlacement ->
+            | Some ((isWord, moveState'), isLegalPlacement) when isWord && isLegalPlacement ->
+                Some(placement :: moveState'.moves)
+            | Some ((_, moveState'), isLegalPlacement) when isLegalPlacement ->
                 tryFindValidMove
                     { state with hand = MultiSet.removeSingle tileId state.hand }
                     { moveState' with
