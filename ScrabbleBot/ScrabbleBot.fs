@@ -1,4 +1,4 @@
-﻿module internal ScrabbleBot
+module internal ScrabbleBot
 
 open ScrabbleUtil.DebugPrint
 
@@ -242,10 +242,15 @@ let rec tryFindValidMove (state: gameState) (moveState: MoveState) (direction: c
                 let stepWithTile =
                     ScrabbleUtil.Dictionary.step ch moveState.dict
                     |> Utils.flatMap (fun res ->
-                        // If this is the first tile to be looked at, we need to use reverse
-                        match List.length moveState.createdWord with
-                        | 0 -> expandOption (ScrabbleUtil.Dictionary.reverse (snd res)) moveState
-                        | _ -> Some(fst res, { moveState with dict = snd res }))
+                        let fallback =
+                            Some(fst res, { moveState with dict = snd res })
+                        // If this is the first tile to be looked at (going right or down), we need to use reverse
+                        match direction with
+                        | (x, y) when x > 0 || y > 0 ->
+                            match List.length moveState.createdWord with
+                            | 0 -> expandOption (ScrabbleUtil.Dictionary.reverse (snd res)) moveState
+                            | _ -> fallback
+                        | _ -> fallback)
                     |> Option.map (fun (isWord, ms) -> (isWord, { ms with createdWord = ch :: ms.createdWord }))
 
                 let stepWithExisting (isWord, moveState') =
