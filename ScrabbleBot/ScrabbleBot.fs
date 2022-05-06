@@ -38,12 +38,17 @@ let findAdjacentEmptySquares ((x, y): coord) (placedTiles: placedTilesMap) =
 /// placed tile.
 // TODO: Handle outside of board, handle holes in board etc.
 let findAllPossibleSpawnPositions (state: gameState) =
-    Seq.fold
-        (fun acc pos ->
-            findAdjacentEmptySquares pos state.placedTiles
-            |> List.fold (fun acc' adj -> Set.add adj acc') acc)
-        Set.empty
-        (Map.keys state.placedTiles)
+    let locations =
+        Seq.fold
+            (fun acc pos ->
+                findAdjacentEmptySquares pos state.placedTiles
+                |> List.fold (fun acc' adj -> Set.add adj acc') acc)
+            Set.empty
+            (Map.keys state.placedTiles)
+
+    match Set.count locations with
+    | s when s > 0 -> locations
+    | _ -> Set.ofList [ (0, 0) ]
 
 let rec findStartOfWord (curPos: coord) (state: gameState) (invertedDirectionVector: coord) =
     let nextPos =
