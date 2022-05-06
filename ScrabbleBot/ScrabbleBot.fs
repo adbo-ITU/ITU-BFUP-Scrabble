@@ -1,4 +1,4 @@
-module internal ScrabbleBot
+﻿module internal ScrabbleBot
 
 open ScrabbleUtil.DebugPrint
 
@@ -172,6 +172,12 @@ let validateTilePlacement (pos: coord) (letter: char) (state: gameState) (direct
 let createdWordIsLongerThan a b =
     List.length a.createdWord > List.length b.createdWord
 
+let keepBestResult a b =
+    match (a, b) with
+    | (Some (a'), Some (b')) when createdWordIsLongerThan a' b' -> a
+    | (Some (_), None) -> a
+    | _ -> b
+
 let rec tryFindValidMove (state: gameState) (moveState: MoveState) (direction: coord) =
     let handleTileId tileId =
         let handleLetter (ch, points) =
@@ -262,24 +268,13 @@ let rec tryFindValidMove (state: gameState) (moveState: MoveState) (direction: c
                 tryFindValidMove (updateState state) (updateMoveState moveState') direction
             | _ -> None
 
-        let folder acc piece =
-            let res = handleLetter piece
-
-            match (res, acc) with
-            | (Some (newRes), Some (oldRes)) when createdWordIsLongerThan newRes oldRes -> res
-            | (Some (_), None) -> res
-            | _ -> acc
+        let folder acc piece = keepBestResult (handleLetter piece) acc
 
         let tile = Map.find tileId state.pieces
         Set.fold folder None tile
 
     let folder acc tileId _ =
-        let res = handleTileId tileId
-
-        match (res, acc) with
-        | (Some (newRes), Some (oldRes)) when createdWordIsLongerThan newRes oldRes -> res
-        | (Some (_), None) -> res
-        | _ -> acc
+        keepBestResult (handleTileId tileId) acc
 
     MultiSet.fold folder None state.hand
 
@@ -293,33 +288,9 @@ let findMoveOnSquare (pos: coord) (state: gameState) =
     let result =
         List.fold
             (fun res direction ->
-                let move =
-                    tryFindValidMove state (initMoveWithExistingWord pos state direction) direction
-
-                match (move, res) with
-                | (Some (newMove), Some (oldMove)) when createdWordIsLongerThan newMove oldMove ->
-                    debugPrint (sprintf "Found better move in another direction.\n")
-                    move
-                | (Some (_), None) ->
-                    debugPrint (sprintf "Found a move in some direction.\n")
-                    move
-                | _ -> res)
+                keepBestResult (tryFindValidMove state (initMoveWithExistingWord pos state direction) direction) res)
             None
             directions
-
-    // pretty print result
-    let prettifyResult =
-        function
-        | Some (placements) ->
-            Seq.rev placements
-            |> Seq.fold
-                (fun acc placement ->
-                    let (pos, (_tileId, (ch, _points))) = placement
-                    sprintf "%s\n- %c at %A" acc ch pos)
-                "Found move:"
-        | None -> "No move found"
-
-    //debugPrint (sprintf "Result: %A\n" (prettifyResult result))
 
     result
 
@@ -329,19 +300,5 @@ let findMoveOnSquare (pos: coord) (state: gameState) =
 // TODO: Handle first move on the board
 let findPlay (state: gameState) =
     findAllPossibleSpawnPositions state
-    |> Set.fold
-        (fun acc pos ->
-            let play = findMoveOnSquare pos state
-
-            match (play, acc) with
-            | (Some (newPlay), Some (oldPlay)) when createdWordIsLongerThan newPlay oldPlay ->
-                debugPrint (sprintf "Found a new play: %A longer than the current play: %A!\n\n" newPlay oldPlay)
-                play
-            | (Some (newPlay), None) ->
-                debugPrint (sprintf "This is the first play we've found: %A!\n\n" newPlay)
-                play
-            | _ ->
-                debugPrint ("Couldn't find a new play.\n\n")
-                acc)
-        None
+    |> Set.fold (fun acc pos -> keepBestResult (findMoveOnSquare pos state) acc) None
     |> Option.map (fun ms -> ms.moves)
