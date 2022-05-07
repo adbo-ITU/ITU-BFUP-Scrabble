@@ -341,8 +341,10 @@ let findMoveOnSquare (pos: coord) (state: gameState) resultProcessor =
 
 let findPlay (state: gameState) =
     let timeout =
-        match state.timeout with
-        | Some t when t > 0u -> (int) t
+        // We remove 100 ms from the timeout to make space for things that might
+        // take time aside from finding the moves.
+        match Option.map ((int) >> (-) 100 >> Utils.max 0) state.timeout with
+        | Some t when t >= 0 -> t
         | _ -> -1
 
     let mutable bestMove = None
