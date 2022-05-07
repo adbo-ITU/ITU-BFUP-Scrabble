@@ -1,6 +1,7 @@
 ﻿module internal ScrabbleBot
 
 open ScrabbleUtil.DebugPrint
+open System.Threading.Tasks
 
 type coord = int * int
 type tile = Set<char * int>
@@ -13,11 +14,20 @@ type gameState =
       pieces: Map<uint32, tile>
       placedTiles: placedTilesMap }
 
+type Move = coord * (uint32 * (char * int))
+
 type MoveState =
     { cursor: coord
       dict: ScrabbleUtil.Dictionary.Dict
-      moves: list<coord * (uint32 * (char * int))>
+      moves: list<Move>
       createdWord: list<char> }
+
+type Result = { score: int; moves: list<Move> }
+
+type ResultMsg =
+    | Found of Result
+    | Get of AsyncReplyChannel<Result option>
+
 
 let findAdjacentEmptySquares ((x, y): coord) (placedTiles: placedTilesMap) =
     let directionVectors = [ (0, 1); (1, 0); (0, -1); (-1, 0) ]
@@ -48,7 +58,8 @@ let findAllPossibleSpawnPositions (state: gameState) =
     | _ -> Set.ofList [ (0, 0) ]
 
 let rec findStartOfWord (curPos: coord) (state: gameState) (invertedDirectionVector: coord) =
-    let nextPos = Utils.addCoords curPos invertedDirectionVector
+    let nextPos =
+        Utils.addCoords curPos invertedDirectionVector
 
     match Map.containsKey nextPos state.placedTiles with
     | true -> findStartOfWord nextPos state invertedDirectionVector
@@ -59,9 +70,11 @@ let getLetter pos state =
 
 /// Should be used to "start" a word with what is already placed on the board.
 let initMoveWithExistingWord (pos: coord) (state: gameState) (directionVector: int * int) =
-    let invertedDirectionVector = (-(fst directionVector), -(snd directionVector))
+    let invertedDirectionVector =
+        (-(fst directionVector), -(snd directionVector))
 
-    let startPos = findStartOfWord pos state invertedDirectionVector
+    let startPos =
+        findStartOfWord pos state invertedDirectionVector
 
     let numStartLetters =
         match directionVector with
@@ -148,7 +161,9 @@ let validateTilePlacement (pos: coord) (letter: char) (state: gameState) (direct
                 coords
 
         let coordsToCheckAbove = Utils.coordsBetween pos startPos
-        let coordsToCheckBelow = Utils.coordsBetween pos endPos |> Seq.skip 1
+
+        let coordsToCheckBelow =
+            Utils.coordsBetween pos endPos |> Seq.skip 1
 
         let acc =
             Seq.fold folder (Some(false, state.dict)) coordsToCheckAbove
@@ -185,7 +200,12 @@ let keepBestResult a b =
     | (Some (_), None) -> a
     | _ -> b
 
-let rec tryFindValidMove (state: gameState) (moveState: MoveState) (direction: coord) =
+let rec tryFindValidMove
+    (state: gameState)
+    (moveState: MoveState)
+    (direction: coord)
+    (resultProcessor: MailboxProcessor<ResultMsg>)
+    =
     let handleTileId tileId =
         let handleLetter (ch, points) =
             let isWithinBounds =
@@ -199,7 +219,9 @@ let rec tryFindValidMove (state: gameState) (moveState: MoveState) (direction: c
                     | None -> false
 
             let validatePlacement ms =
-                let isValid = validateTilePlacement ms.cursor ch state direction
+                let isValid =
+                    validateTilePlacement ms.cursor ch state direction
+
                 isValid && isWithinBounds
 
             let stepAndContinue =
@@ -211,7 +233,8 @@ let rec tryFindValidMove (state: gameState) (moveState: MoveState) (direction: c
                 let stepWithTile =
                     ScrabbleUtil.Dictionary.step ch moveState.dict
                     |> Utils.flatMap (fun res ->
-                        let fallback = Some(fst res, { moveState with dict = snd res })
+                        let fallback =
+                            Some(fst res, { moveState with dict = snd res })
                         // If this is the first tile to be looked at (going right or down), we need to use reverse
                         match direction with
                         | (x, y) when x > 0 || y > 0 ->
@@ -222,7 +245,8 @@ let rec tryFindValidMove (state: gameState) (moveState: MoveState) (direction: c
                     |> Option.map (fun (isWord, ms) -> (isWord, { ms with createdWord = ch :: ms.createdWord }))
 
                 let stepWithExisting (isWord, moveState') =
-                    let endPos = findStartOfWord moveState'.cursor state direction
+                    let endPos =
+                        findStartOfWord moveState'.cursor state direction
 
                     let coords =
                         Utils.coordsBetween moveState'.cursor endPos
@@ -255,7 +279,8 @@ let rec tryFindValidMove (state: gameState) (moveState: MoveState) (direction: c
                 |> Utils.flatMap checkWordIfLeftOrUp
                 |> Option.map (fun s -> (s, validatePlacement moveState))
 
-            let placement = (moveState.cursor, (tileId, (ch, points)))
+            let placement =
+                (moveState.cursor, (tileId, (ch, points)))
 
             let updateState s =
                 { s with hand = MultiSet.removeSingle tileId s.hand }
@@ -268,15 +293,21 @@ let rec tryFindValidMove (state: gameState) (moveState: MoveState) (direction: c
 
             match stepAndContinue with
             | Some ((isWord, moveState'), isLegalPlacement) when isWord && isLegalPlacement ->
+                let foundResult =
+                    { moves = placement :: moveState'.moves
+                      score = List.length moveState'.createdWord + 1 }
+
+                resultProcessor.Post(Found foundResult)
+
                 let next =
-                    tryFindValidMove (updateState state) (updateMoveState moveState') direction
+                    tryFindValidMove (updateState state) (updateMoveState moveState') direction resultProcessor
 
                 match next with
                 | Some (ms) when createdWordIsLongerThan ms moveState' -> next
-                | _ -> Some { moveState' with moves = placement :: moveState'.moves }
+                | _ -> Some { moveState' with moves = foundResult.moves }
 
             | Some ((_, moveState'), isLegalPlacement) when isLegalPlacement ->
-                tryFindValidMove (updateState state) (updateMoveState moveState') direction
+                tryFindValidMove (updateState state) (updateMoveState moveState') direction resultProcessor
             | _ -> None
 
         let folder acc piece = keepBestResult (handleLetter piece) acc
@@ -289,7 +320,7 @@ let rec tryFindValidMove (state: gameState) (moveState: MoveState) (direction: c
 
     MultiSet.fold folder None state.hand
 
-let findMoveOnSquare (pos: coord) (state: gameState) =
+let findMoveOnSquare (pos: coord) (state: gameState) resultProcessor =
     let directions =
         [ (-1, 0) // Left
           (0, -1) // Up
@@ -299,13 +330,48 @@ let findMoveOnSquare (pos: coord) (state: gameState) =
     let result =
         List.fold
             (fun res direction ->
-                keepBestResult (tryFindValidMove state (initMoveWithExistingWord pos state direction) direction) res)
+                keepBestResult
+                    (tryFindValidMove state (initMoveWithExistingWord pos state direction) direction resultProcessor)
+                    res)
             None
             directions
 
     result
 
 let findPlay (state: gameState) =
+    let timeout = 2000u
+
+    let mutable bestMove = None
+
+    let resultProcessor =
+        MailboxProcessor.Start (fun inbox ->
+            let rec loop () =
+                async {
+                    let! recv = inbox.Receive()
+
+                    match (bestMove, recv) with
+                    | (None, Found m) -> bestMove <- Some m
+                    | (Some bm, Found m) when m.score > bm.score -> bestMove <- Some m
+                    | (_, Get ch) -> ch.Reply(bestMove)
+                    | _ -> ()
+
+                    return! loop ()
+                }
+
+            loop ())
+
+    let runWithTimeout (timeout: uint32) computations =
+        // Task.WaitAll blocks the thread until timeout is reached. A boolean is
+        // returned indicating if all tasks completed or not - but we don't need
+        // that - we just take the hitherto best result anyway.
+        Task.WaitAll(computations, (int) timeout)
+
     findAllPossibleSpawnPositions state
-    |> Set.fold (fun acc pos -> keepBestResult (findMoveOnSquare pos state) acc) None
-    |> Option.map (fun ms -> ms.moves)
+    |> Seq.map (fun pos -> Task.Factory.StartNew(fun () -> findMoveOnSquare pos state resultProcessor))
+    |> Seq.cast<Task>
+    |> Seq.toArray
+    |> runWithTimeout timeout
+    |> ignore
+
+    resultProcessor.PostAndReply(fun ch -> Get ch)
+    |> Option.map (fun result -> result.moves)
