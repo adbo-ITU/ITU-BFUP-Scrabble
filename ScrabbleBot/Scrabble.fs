@@ -50,9 +50,10 @@ module State =
           ourPlayerNumber: uint32
           players: uint32 list
           hand: MultiSet.MultiSet<uint32>
-          placedTiles: Map<coord, uint32 * (char * int)> }
+          placedTiles: Map<coord, uint32 * (char * int)>
+          timeout: uint32 option }
 
-    let mkState b d pn h currentPlayer numPlayers =
+    let mkState b d pn h currentPlayer numPlayers timeout =
         let players =
             Utils.rotate (uint32 currentPlayer - 1u) [ 1u .. numPlayers ]
 
@@ -61,7 +62,8 @@ module State =
           players = players
           ourPlayerNumber = pn
           hand = h
-          placedTiles = Map.empty }
+          placedTiles = Map.empty
+          timeout = timeout }
 
     let board st = st.board
     let dict st = st.dict
@@ -79,7 +81,8 @@ module State =
           dict = st.dict
           hand = st.hand
           pieces = pieces
-          placedTiles = st.placedTiles }
+          placedTiles = st.placedTiles
+          timeout = st.timeout }
 
 module Scrabble =
     open System.Threading
@@ -179,7 +182,7 @@ module Scrabble =
 
                 aux st'
 
-            // RCM (CMTimeOut _) is not defined
+            | RCM (CMTimeout _)
             | RCM (CMPlayFailed _)
             | RCM (CMPassed _)
             | RCM (CMChange _) -> aux { st with players = State.nextPlayersList st }
@@ -188,7 +191,6 @@ module Scrabble =
 
             | RCM (CMGameOver _) -> debugPrint "Game over"
 
-            | RCM a -> failwith (sprintf "not implmented: %A" a)
             | RGPE err ->
                 printfn "Gameplay Error:\n%A" err
                 aux st
@@ -232,4 +234,4 @@ module Scrabble =
         let handSet =
             List.fold (fun acc (x, k) -> MultiSet.add x k acc) MultiSet.empty hand
 
-        fun () -> playGame cstream tiles (State.mkState board dict playerNumber handSet playerTurn numPlayers)
+        fun () -> playGame cstream tiles (State.mkState board dict playerNumber handSet playerTurn numPlayers timeout)

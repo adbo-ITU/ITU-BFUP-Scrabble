@@ -12,7 +12,8 @@ type gameState =
       dict: ScrabbleUtil.Dictionary.Dict
       hand: MultiSet.MultiSet<uint32>
       pieces: Map<uint32, tile>
-      placedTiles: placedTilesMap }
+      placedTiles: placedTilesMap
+      timeout: uint32 option }
 
 type Move = coord * (uint32 * (char * int))
 
@@ -339,7 +340,10 @@ let findMoveOnSquare (pos: coord) (state: gameState) resultProcessor =
     result
 
 let findPlay (state: gameState) =
-    let timeout = 2000u
+    let timeout =
+        match state.timeout with
+        | Some t when t > 0u -> (int) t
+        | _ -> -1
 
     let mutable bestMove = None
 
@@ -360,11 +364,11 @@ let findPlay (state: gameState) =
 
             loop ())
 
-    let runWithTimeout (timeout: uint32) computations =
+    let runWithTimeout (timeout: int) computations =
         // Task.WaitAll blocks the thread until timeout is reached. A boolean is
         // returned indicating if all tasks completed or not - but we don't need
         // that - we just take the hitherto best result anyway.
-        Task.WaitAll(computations, (int) timeout)
+        Task.WaitAll(computations, timeout)
 
     findAllPossibleSpawnPositions state
     |> Seq.map (fun pos -> Task.Factory.StartNew(fun () -> findMoveOnSquare pos state resultProcessor))
