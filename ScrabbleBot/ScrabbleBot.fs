@@ -1,4 +1,4 @@
-﻿module internal ScrabbleBot
+module internal ScrabbleBot
 
 open ScrabbleUtil.DebugPrint
 open System.Threading.Tasks
@@ -343,7 +343,7 @@ let findPlay (state: gameState) =
     let timeout =
         // We remove 100 ms from the timeout to make space for things that might
         // take time aside from finding the moves.
-        match Option.map ((int) >> (-) 100 >> Utils.max 0) state.timeout with
+        match Option.map ((int) >> (fun t -> t - 100) >> Utils.max 0) state.timeout with
         | Some t when t >= 0 -> t
         | _ -> -1
 
