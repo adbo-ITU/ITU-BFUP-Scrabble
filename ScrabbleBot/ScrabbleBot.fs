@@ -1,7 +1,8 @@
-module internal ScrabbleBot
+﻿module internal ScrabbleBot
 
 open ScrabbleUtil.DebugPrint
 open System.Threading.Tasks
+open System.Threading
 
 type coord = int * int
 type tile = Set<char * int>
@@ -206,6 +207,7 @@ let rec tryFindValidMove
     (moveState: MoveState)
     (direction: coord)
     (resultProcessor: MailboxProcessor<ResultMsg>)
+    (cancellationToken: CancellationToken)
     =
     let handleTileId tileId =
         let handleLetter (ch, points) =
@@ -301,14 +303,24 @@ let rec tryFindValidMove
                 resultProcessor.Post(Found foundResult)
 
                 let next =
-                    tryFindValidMove (updateState state) (updateMoveState moveState') direction resultProcessor
+                    tryFindValidMove
+                        (updateState state)
+                        (updateMoveState moveState')
+                        direction
+                        resultProcessor
+                        cancellationToken
 
                 match next with
                 | Some (ms) when createdWordIsLongerThan ms moveState' -> next
                 | _ -> Some { moveState' with moves = foundResult.moves }
 
             | Some ((_, moveState'), isLegalPlacement) when isLegalPlacement ->
-                tryFindValidMove (updateState state) (updateMoveState moveState') direction resultProcessor
+                tryFindValidMove
+                    (updateState state)
+                    (updateMoveState moveState')
+                    direction
+                    resultProcessor
+                    cancellationToken
             | _ -> None
 
         let folder acc piece = keepBestResult (handleLetter piece) acc
@@ -319,9 +331,12 @@ let rec tryFindValidMove
     let folder acc tileId _ =
         keepBestResult (handleTileId tileId) acc
 
-    MultiSet.fold folder None state.hand
+    if not cancellationToken.IsCancellationRequested then
+        MultiSet.fold folder None state.hand
+    else
+        None
 
-let findMoveOnSquare (pos: coord) (state: gameState) resultProcessor =
+let findMoveOnSquare (pos: coord) (state: gameState) resultProcessor cancellationToken =
     let directions =
         [ (-1, 0) // Left
           (0, -1) // Up
@@ -332,7 +347,12 @@ let findMoveOnSquare (pos: coord) (state: gameState) resultProcessor =
         List.fold
             (fun res direction ->
                 keepBestResult
-                    (tryFindValidMove state (initMoveWithExistingWord pos state direction) direction resultProcessor)
+                    (tryFindValidMove
+                        state
+                        (initMoveWithExistingWord pos state direction)
+                        direction
+                        resultProcessor
+                        cancellationToken)
                     res)
             None
             directions
@@ -366,6 +386,11 @@ let findPlay (state: gameState) =
 
             loop ())
 
+    let cancellationTokenSource =
+        match timeout with
+        | t when t >= 0 -> new CancellationTokenSource(t)
+        | _ -> new CancellationTokenSource()
+
     let runWithTimeout (timeout: int) computations =
         // Task.WaitAll blocks the thread until timeout is reached. A boolean is
         // returned indicating if all tasks completed or not - but we don't need
@@ -373,7 +398,8 @@ let findPlay (state: gameState) =
         Task.WaitAll(computations, timeout)
 
     findAllPossibleSpawnPositions state
-    |> Seq.map (fun pos -> Task.Factory.StartNew(fun () -> findMoveOnSquare pos state resultProcessor))
+    |> Seq.map (fun pos ->
+        Task.Factory.StartNew(fun () -> findMoveOnSquare pos state resultProcessor cancellationTokenSource.Token))
     |> Seq.cast<Task>
     |> Seq.toArray
     |> runWithTimeout timeout
