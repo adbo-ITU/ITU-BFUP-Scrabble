@@ -19,3 +19,12 @@ Requires .NET v6 to be installed. Our `dotnet --version` outputs `6.0.104`. To r
 cd ScrabbleTemplate
 dotnet run
 ```
+
+### Using Docker
+To be completely sure that you (likely the TA grading this project) can run this project, we've provided a `Dockerfile` that can be used.
+
+To run the project using Docker, simply run the following two commands:
+```bash
+docker build -t scrabble .
+docker run -it --rm scrabble
+```
