@@ -40,7 +40,7 @@ let main argv =
     //let board      = ScrabbleUtil.InfiniteHoleBoard.infiniteHoleBoard ()
 
     let words =
-        readLines "./Dictionaries/CommonEnglishWords10000.txt"
+        readLines "./Dictionaries/English.txt"
 
     let handSize = 7u
     let timeout = None
