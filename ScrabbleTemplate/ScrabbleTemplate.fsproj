@@ -6,8 +6,9 @@
   </PropertyGroup>
 
   <ItemGroup>
-
+    <Content Include="Dictionaries\CommonEnglishWords10000.txt" />
     <Content Include="Dictionaries\English.txt" />
+    <Content Include="Dictionaries\Custom.txt" />
     <Compile Include="Program.fs" />
   </ItemGroup>
 
