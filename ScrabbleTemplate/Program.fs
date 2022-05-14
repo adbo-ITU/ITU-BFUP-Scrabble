@@ -20,7 +20,7 @@ let spawnMultiples name dict bot =
 
 [<EntryPoint>]
 let main argv =
-    ScrabbleUtil.DebugPrint.toggleDebugPrint true // Change to false to supress debug output
+    ScrabbleUtil.DebugPrint.toggleDebugPrint false // Change to false to supress debug output
 
     System.Console.BackgroundColor <- System.ConsoleColor.White
     System.Console.ForegroundColor <- System.ConsoleColor.Black
@@ -61,7 +61,10 @@ let main argv =
     // let players =
     //     spawnMultiples "OxyphenButazone" dictionary Oxyphenbutazone.Scrabble.startGame 4
 
+    let stopWatch = System.Diagnostics.Stopwatch.StartNew()
     do ScrabbleServer.Comm.startGame board dictionary handSize timeout tiles seed port players
+    stopWatch.Stop()
+    ScrabbleUtil.DebugPrint.forcePrint (sprintf "Game finished in: %A\n" stopWatch.Elapsed)
 
     ScrabbleUtil.DebugPrint.forcePrint ("Server has terminated. Press Enter to exit program.\n")
     System.Console.ReadLine() |> ignore

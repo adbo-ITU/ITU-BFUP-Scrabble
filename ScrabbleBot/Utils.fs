@@ -38,3 +38,5 @@ let flatMap f opt =
     match opt with
     | Some x -> f x
     | _ -> None
+
+let max a b = if a > b then a else b
