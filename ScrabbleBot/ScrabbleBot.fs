@@ -361,6 +361,7 @@ let getWordScore (moves: Move list) (state: gameState) =
 
     let tiles = List.map (snd >> snd) moves
 
+    // Get a list of squareFunctions from each square
     List.mapi
         (fun pos (coord, _) ->
             getSquare coord
@@ -370,8 +371,11 @@ let getWordScore (moves: Move list) (state: gameState) =
                     (priority, sqFun tiles pos) :: acc)
                 [])
         moves
+    // Flatten the lists to one list
     |> Utils.flattenList
+    // Sort the functions by priority
     |> List.sortBy fst
+    // Accumulate the score
     |> List.fold (fun acc (_, sqFun) -> sqFun acc |> getResult) 0
 
 let findPlay (state: gameState) =
