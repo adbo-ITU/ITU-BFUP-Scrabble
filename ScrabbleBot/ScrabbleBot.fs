@@ -178,11 +178,40 @@ let validateTilePlacement (pos: coord) (letter: char) (state: gameState) (direct
     else
         true
 
-let moveIsWorthMore (a: MoveState) (b: MoveState) = a.score > b.score
+// TODO: Should use board.defaultSquare for already placed tiles (including adjacent words)
+let getWordScore (moves: Move list) (state: gameState) =
+    let getSquare (coord: coord) =
+        match state.board.squares coord with
+        | StateMonad.Result.Success item -> Option.get item
+        | _ -> failwith "square has no squareFun"
 
-let keepBestResult a b =
+    let getResult =
+        function
+        | StateMonad.Result.Success res -> res
+        | _ -> failwith "StateMonad failure"
+
+    let tiles = List.map (snd >> snd) moves
+
+    // Get a list of squareFunctions and their priorities from each square
+    List.mapi
+        (fun pos (coord, _) ->
+            getSquare coord
+            |> Map.fold (fun acc priority sqFun -> (priority, sqFun tiles pos) :: acc) [])
+        moves
+    // Flatten the lists to one list
+    |> Utils.flattenList
+    // Sort the functions by priority
+    |> List.sortBy fst
+    // Accumulate the score
+    |> List.fold (fun acc (_, sqFun) -> sqFun acc |> getResult) 0
+
+let moveIsWorthMore (a: MoveState) (b: MoveState) (st: gameState) =
+    // TODO: Should not use only placed tiles, but all tiles in the word
+    getWordScore a.moves st > getWordScore b.moves st
+
+let keepBestResult a b st =
     match (a, b) with
-    | Some a', Some b' when moveIsWorthMore a' b' -> a
+    | Some a', Some b' when moveIsWorthMore a' b' st -> a
     | Some _, None -> a
     | _ -> b
 
@@ -296,7 +325,7 @@ let rec tryFindValidMove
                         cancellationToken
 
                 match next with
-                | Some ms when moveIsWorthMore ms moveState' -> next
+                | Some ms when moveIsWorthMore ms moveState' state -> next
                 | _ ->
                     Some
                         { moveState' with
@@ -312,13 +341,13 @@ let rec tryFindValidMove
                     cancellationToken
             | _ -> None
 
-        let folder acc piece = keepBestResult (handleLetter piece) acc
+        let folder acc piece = keepBestResult (handleLetter piece) acc state
 
         let tile = Map.find tileId state.pieces
         Set.fold folder None tile
 
     let folder acc tileId _ =
-        keepBestResult (handleTileId tileId) acc
+        keepBestResult (handleTileId tileId) acc state
 
     if not cancellationToken.IsCancellationRequested then
         MultiSet.fold folder None state.hand
@@ -341,38 +370,13 @@ let findMoveOnSquare (pos: coord) (state: gameState) resultProcessor cancellatio
                         (initMoveWithExistingWord pos state direction)
                         direction
                         resultProcessor
-                        cancellationToken)
-                    res)
+                        cancellationToken) 
+                    res
+                    state)
             None
             directions
 
     result
-
-let getWordScore (moves: Move list) (state: gameState) =
-    let getSquare (coord: coord) =
-        match state.board.squares coord with
-        | StateMonad.Result.Success item -> Option.get item
-        | _ -> failwith "square has no squareFun"
-
-    let getResult =
-        function
-        | StateMonad.Result.Success res -> res
-        | _ -> failwith "StateMonad failure"
-
-    let tiles = List.map (snd >> snd) moves
-
-    // Get a list of squareFunctions and their priorities from each square
-    List.mapi
-        (fun pos (coord, _) ->
-            getSquare coord
-            |> Map.fold (fun acc priority sqFun -> (priority, sqFun tiles pos) :: acc) [])
-        moves
-    // Flatten the lists to one list
-    |> Utils.flattenList
-    // Sort the functions by priority
-    |> List.sortBy fst
-    // Accumulate the score
-    |> List.fold (fun acc (_, sqFun) -> sqFun acc |> getResult) 0
 
 let findPlay (state: gameState) =
     let timeout =
