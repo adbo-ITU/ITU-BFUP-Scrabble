@@ -361,15 +361,11 @@ let getWordScore (moves: Move list) (state: gameState) =
 
     let tiles = List.map (snd >> snd) moves
 
-    // Get a list of squareFunctions from each square
+    // Get a list of squareFunctions and their priorities from each square
     List.mapi
         (fun pos (coord, _) ->
             getSquare coord
-            |> Map.fold
-                (fun acc priority sqFun ->
-                    debugPrint $"Priority added: {priority}\n"
-                    (priority, sqFun tiles pos) :: acc)
-                [])
+            |> Map.fold (fun acc priority sqFun -> (priority, sqFun tiles pos) :: acc) [])
         moves
     // Flatten the lists to one list
     |> Utils.flattenList
