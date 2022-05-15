@@ -348,7 +348,51 @@ let findMoveOnSquare (pos: coord) (state: gameState) resultProcessor cancellatio
 
     result
 
+let getWordScore (moves: Move list) (state: gameState) =
+    let getSquare (coord: coord) =
+        match state.board.squares coord with
+        | StateMonad.Result.Success item -> Option.get item
+        | _ -> failwith "square has no squareFun"
+
+    let getResult =
+        function
+        | StateMonad.Result.Success res -> res
+        | _ -> failwith "StateMonad failure"
+
+    let tiles = List.map (snd >> snd) moves
+
+    let res =
+        List.mapi
+            (fun pos (coord, _) ->
+                getSquare coord
+                |> Map.fold
+                    (fun acc priority sqFun ->
+                        debugPrint $"Priority added: {priority}\n"
+                        (priority, sqFun tiles pos) :: acc) [])
+            moves
+        |> Utils.flattenList
+        |> List.sortBy fst
+        |> List.fold (fun acc (_, sqFun) -> sqFun acc |> getResult) 0
+
+    debugPrint $"Score from move: {res}\n"
+    res
+
 let findPlay (state: gameState) =
+    debugPrint $"(0, 0): {state.board.squares (0, 0)}\n"
+    debugPrint $"(1, 1): {state.board.squares (1, 1)}\n"
+    debugPrint $"(2, 2): {state.board.squares (2, 2)}\n"
+    debugPrint $"(3, 3): {state.board.squares (3, 3)}\n"
+    debugPrint $"(7, 7): {state.board.squares (7, 7)}\n"
+
+    getWordScore
+        [ ((3, 7), (8u, ('H', 4)))
+          ((4, 7), (5u, ('E', 1)))
+          ((5, 7), (12u, ('L', 1)))
+          ((6, 7), (12u, ('L', 1)))
+          ((7, 7), (15u, ('O', 1))) ]
+        state
+    |> ignore
+
     let timeout =
         // We remove 50 ms from the timeout to make space for things that might
         // take time aside from finding the moves.
