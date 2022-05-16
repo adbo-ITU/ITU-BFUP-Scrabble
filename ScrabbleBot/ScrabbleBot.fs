@@ -312,7 +312,7 @@ let rec tryFindValidMove
             | Some ((isWord, moveState'), isLegalPlacement) when isWord && isLegalPlacement ->
                 let foundResult =
                     { moves = placement :: moveState'.moves
-                      score = List.length moveState'.createdWord + 1 }
+                      score = getWordScore moveState' state }
 
                 resultProcessor.Post(Found foundResult)
 
