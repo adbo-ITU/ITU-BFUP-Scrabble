@@ -378,29 +378,6 @@ let findMoveOnSquare (pos: coord) (state: gameState) resultProcessor cancellatio
     result
 
 let findPlay (state: gameState) =
-    let score =
-        getWordScore
-            { cursor = (0, 0)
-              dict = state.dict
-              moves =
-                [ ((5, 7), (1u, ('N', 1)))
-                  ((6, 7), (1u, ('E', 1)))
-                  ((7, 7), (1u, ('S', 1)))
-                  ((8, 7), (1u, ('S', 1))) ]
-              createdWord =
-                [ ((2, 7), 'F')     // Regular 4 points
-                  ((3, 7), 'I')     // Regular 1 point
-                  ((4, 7), 'T')     // Double-letter 1 point (but previously placed, so regular 1 point instead)
-                  ((5, 7), 'N')     // Regular 1 point
-                  ((6, 7), 'E')     // Regular 1 point
-                  ((7, 7), 'S')     // Triple-word 1 point
-                  ((8, 7), 'S') ] } // Regular 1 point
-            state
-
-    debugPrint $"CALCULATED SCORE: {score}\n" // Expected: (4 + (6 * 1)) * 3 = 30
-
-    System.Console.ReadLine() |> ignore
-
     let timeout =
         // We remove 50 ms from the timeout to make space for things that might
         // take time aside from finding the moves.
