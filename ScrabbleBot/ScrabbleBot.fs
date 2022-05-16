@@ -65,7 +65,8 @@ let rec findStartOfWord (curPos: coord) (state: gameState) (invertedDirectionVec
     | true -> findStartOfWord nextPos state invertedDirectionVector
     | false -> curPos
 
-let getLetter pos state = Map.find pos state.placedTiles |> snd |> fst
+let getLetter pos state =
+    Map.find pos state.placedTiles |> snd |> fst
 
 /// Should be used to "start" a word with what is already placed on the board.
 let initMoveWithExistingWord (pos: coord) (state: gameState) (directionVector: int * int) =
@@ -178,7 +179,7 @@ let validateTilePlacement (pos: coord) (letter: char) (state: gameState) (direct
 
 let getWordScore (ms: MoveState) (state: gameState) =
     let getSquare coord =
-        // Check if this tile was played by us this turn
+        // Check if the tile was played by us this turn
         if List.exists (fun (coord', _) -> coord = coord') ms.moves then
             match state.board.squares coord with
             | StateMonad.Result.Success item -> Option.get item
@@ -191,16 +192,14 @@ let getWordScore (ms: MoveState) (state: gameState) =
         | StateMonad.Result.Success res -> res
         | _ -> acc
 
-    // Janky solution to get a tile from a letter
+    // Janky solution
     let getTileFromLetter ch =
         let getTileID ch' = (int ch') - (int 'A') + 1 |> uint
-
-        Map.find (getTileID ch) state.pieces
-        |> Seq.head
-
+        Map.find (getTileID ch) state.pieces |> Seq.head
+        
     let tiles = List.map (fun (_, ch) -> getTileFromLetter ch) ms.createdWord
 
-    ms.moves
+    ms.createdWord
     // Get a list of squareFunctions and their priorities from each square
     |> List.mapi (fun pos (coord, _) ->
         getSquare coord
@@ -340,7 +339,8 @@ let rec tryFindValidMove
                     cancellationToken
             | _ -> None
 
-        let folder acc piece = keepBestResult (handleLetter piece) acc state
+        let folder acc piece =
+            keepBestResult (handleLetter piece) acc state
 
         let tile = Map.find tileId state.pieces
         Set.fold folder None tile
@@ -378,6 +378,29 @@ let findMoveOnSquare (pos: coord) (state: gameState) resultProcessor cancellatio
     result
 
 let findPlay (state: gameState) =
+    let score =
+        getWordScore
+            { cursor = (0, 0)
+              dict = state.dict
+              moves =
+                [ ((5, 7), (1u, ('N', 1)))
+                  ((6, 7), (1u, ('E', 1)))
+                  ((7, 7), (1u, ('S', 1)))
+                  ((8, 7), (1u, ('S', 1))) ]
+              createdWord =
+                [ ((2, 7), 'F')     // Regular 4 points
+                  ((3, 7), 'I')     // Regular 1 point
+                  ((4, 7), 'T')     // Double-letter 1 point (but previously placed, so regular 1 point instead)
+                  ((5, 7), 'N')     // Regular 1 point
+                  ((6, 7), 'E')     // Regular 1 point
+                  ((7, 7), 'S')     // Triple-word 1 point
+                  ((8, 7), 'S') ] } // Regular 1 point
+            state
+
+    debugPrint $"CALCULATED SCORE: {score}\n" // Expected: (4 + (6 * 1)) * 3 = 30
+
+    System.Console.ReadLine() |> ignore
+
     let timeout =
         // We remove 50 ms from the timeout to make space for things that might
         // take time aside from finding the moves.
