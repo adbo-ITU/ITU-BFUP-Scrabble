@@ -40,3 +40,6 @@ let flatMap f opt =
     | _ -> None
 
 let max a b = if a > b then a else b
+
+let flattenList (lst: 'a list list) =
+    List.foldBack (fun x acc -> x @ acc) lst []
