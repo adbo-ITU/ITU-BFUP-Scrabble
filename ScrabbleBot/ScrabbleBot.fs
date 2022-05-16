@@ -117,7 +117,9 @@ let initMoveWithExistingWord (pos: coord) (state: gameState) (directionVector: i
                 { moveState with
                     dict = subDict
                     cursor = Utils.addCoords moveState.cursor directionVector
-                    createdWord = (moveState.cursor, nextLetter) :: moveState.createdWord })
+                    createdWord =
+                        (moveState.cursor, nextLetter)
+                        :: moveState.createdWord })
 
         let initialMoveState =
             Seq.fold (fun acc _ -> Utils.flatMap folder acc) (Some startMoveState) (Seq.init (numStartLetters - 1) id)
@@ -174,40 +176,43 @@ let validateTilePlacement (pos: coord) (letter: char) (state: gameState) (direct
     else
         true
 
-// TODO: Should not use only placed tiles, but all tiles in the word
 let getWordScore (ms: MoveState) (state: gameState) =
     let getSquare coord =
+        // Check if this tile was played by us this turn
         if List.exists (fun (coord', _) -> coord = coord') ms.moves then
-            // We're playing this tile this turn
             match state.board.squares coord with
             | StateMonad.Result.Success item -> Option.get item
             | _ -> failwith "square has no squareFun"
         else
-            // This tile was played previously
             state.board.defaultSquare
 
-    let getResult =
+    let getResult acc =
         function
         | StateMonad.Result.Success res -> res
-        | _ -> failwith "StateMonad failure"
+        | _ -> acc
 
-    let tiles = List.map (snd >> snd) ms.moves
+    // Janky solution to get a tile from a letter
+    let getTileFromLetter ch =
+        let getTileID ch' = (int ch') - (int 'A') + 1 |> uint
 
+        Map.find (getTileID ch) state.pieces
+        |> Seq.head
+
+    let tiles = List.map (fun (_, ch) -> getTileFromLetter ch) ms.createdWord
+
+    ms.moves
     // Get a list of squareFunctions and their priorities from each square
-    List.mapi
-        (fun pos (coord, _) ->
-            getSquare coord
-            |> Map.fold (fun acc priority sqFun -> (priority, sqFun tiles pos) :: acc) [])
-        ms.moves
+    |> List.mapi (fun pos (coord, _) ->
+        getSquare coord
+        |> Map.fold (fun acc priority sqFun -> (priority, sqFun tiles pos) :: acc) [])
     // Flatten the lists to one list
     |> Utils.flattenList
     // Sort the functions by priority
     |> List.sortBy fst
     // Accumulate the score
-    |> List.fold (fun acc (_, sqFun) -> sqFun acc |> getResult) 0
+    |> List.fold (fun acc (_, sqFun) -> sqFun acc |> getResult acc) 0
 
-let moveIsWorthMore (a: MoveState) (b: MoveState) (st: gameState) =
-    getWordScore a st > getWordScore b st
+let moveIsWorthMore (a: MoveState) (b: MoveState) (st: gameState) = getWordScore a st > getWordScore b st
 
 let keepBestResult a b st =
     match (a, b) with
@@ -257,9 +262,7 @@ let rec tryFindValidMove
                             | _ -> fallback
                         | _ -> fallback)
                     |> Option.map (fun (isWord, ms) ->
-                        (isWord,
-                         { ms with
-                             createdWord = (ms.cursor, ch) :: ms.createdWord }))
+                        (isWord, { ms with createdWord = (ms.cursor, ch) :: ms.createdWord }))
 
                 let stepWithExisting (isWord, moveState') =
                     let endPos = findStartOfWord moveState'.cursor state direction
@@ -277,7 +280,9 @@ let rec tryFindValidMove
                                 (ScrabbleUtil.Dictionary.step letter moveState''.dict)
                                 { moveState'' with
                                     cursor = Utils.addCoords moveState''.cursor direction
-                                    createdWord = (moveState''.cursor, letter) :: moveState''.createdWord }
+                                    createdWord =
+                                        (moveState''.cursor, letter)
+                                        :: moveState''.createdWord }
                         | None -> None
 
                     Seq.fold folder (Some(isWord, moveState')) coords
@@ -324,10 +329,7 @@ let rec tryFindValidMove
 
                 match next with
                 | Some ms when moveIsWorthMore ms moveState' state -> next
-                | _ ->
-                    Some
-                        { moveState' with
-                            moves = foundResult.moves }
+                | _ -> Some { moveState' with moves = foundResult.moves }
 
             | Some ((_, moveState'), isLegalPlacement) when isLegalPlacement ->
                 tryFindValidMove
@@ -367,7 +369,7 @@ let findMoveOnSquare (pos: coord) (state: gameState) resultProcessor cancellatio
                         (initMoveWithExistingWord pos state direction)
                         direction
                         resultProcessor
-                        cancellationToken) 
+                        cancellationToken)
                     res
                     state)
             None
