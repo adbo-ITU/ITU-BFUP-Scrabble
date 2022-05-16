@@ -192,7 +192,7 @@ module Scrabble =
             | RCM (CMGameOver _) -> debugPrint "Game over"
 
             | RGPE err ->
-                printfn "Gameplay Error:\n%A" err
+                debugPrint (sprintf "Gameplay Error:\n%A" err)
                 aux st
 
         try
