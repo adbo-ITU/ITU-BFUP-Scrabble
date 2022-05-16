@@ -9,7 +9,7 @@ Group members:
 - [x] 2 points - Finish a game against yourself on an infinite board (you do not have to count points nor play well)
 - [x] 1 point - Multiplayer and implement your dictionary
 - [x] 1 point - Parellise your algorithm
-- [ ] 1 point - Use the DSL to parse the board and calculate points
+- [x] 1 point - Use the DSL to parse the board and calculate points
 - [x] 1 point - Respect the timeout flag
 
 ## How to run
